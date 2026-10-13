@@ -1,0 +1,20 @@
+name: Publish Operations Manager 0.4.0
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-040.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check main.js
+          node -e 'if(require("./manifest.json").version!=="0.4.0")process.exit(1)'
+          test -s styles.css
+          gh release create 0.4.0 main.js manifest.json styles.css --target main --title "Operations Manager 0.4.0 (Beta)" --notes "Edit equipment ordering and deployment from dashboard, including employee, model, serial, dates and old-device return. Assign existing license notes to devices. Group by Phase, export workflow fields to XLSX. Back up your vault before editing." --prerelease
