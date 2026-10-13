@@ -1,0 +1,26 @@
+name: Publish Operations Manager 0.2.0
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-020.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate plugin and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -s main.js
+          test -s manifest.json
+          test -s styles.css
+          node --check main.js
+          node -e 'const m=require("./manifest.json"); if(m.version!=="0.2.0") process.exit(1)'
+          if gh release view 0.2.0 >/dev/null 2>&1; then
+            gh release upload 0.2.0 main.js manifest.json styles.css --clobber
+          else
+            gh release create 0.2.0 main.js manifest.json styles.css --target main --title "Operations Manager 0.2.0 (Beta)" --notes "Dashboard redesign with category navigation, improved alerts, and Excel-compatible CSV export. Back up your vault before updating. Existing notes, Bases and Tasks remain unchanged." --prerelease
+          fi
