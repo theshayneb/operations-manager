@@ -1,0 +1,20 @@
+name: Publish Operations Manager 0.4.22
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-0422.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check main.js
+          node -e 'if(require("./manifest.json").version!=="0.4.22")process.exit(1)'
+          test -s styles.css
+          gh release create 0.4.22 main.js manifest.json styles.css --target main --title "Operations Manager 0.4.22 (Beta)" --notes "Filter Equipment tab to equipment, collapse agreement management cards, show seat availability and <=2-seat warnings on Licenses and Dashboard, and highlight unpaid invoices older than seven days using their Date field." --prerelease
