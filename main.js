@@ -26,7 +26,7 @@ function addMonths(iso,months){const [y,m,d]=iso.split('-').map(Number);if(!y||!
 function tagSet(fm){return new Set((Array.isArray(fm.tags)?fm.tags:typeof fm.tags==='string'?[fm.tags]:[]).map(x=>String(x).replace(/^#/, '').toLowerCase()))}
 function iso(v){if(v instanceof Date)return dateISO(v);if(typeof v==='string')return /^\d{4}-\d{2}-\d{2}$/.test(v)?v:null;return null}
 function daysUntil(d){return Math.round((Date.parse(d+'T00:00:00Z')-Date.parse(dateISO(new Date())+'T00:00:00Z'))/86400000)}
-function classified(file,fm){const t=tagSet(fm),p=file.path.toLowerCase();if(t.has('ops-project')||t.has('project')&&p.includes('project'))return 'project';if(t.has('invoice')||p.includes('/invoices/'))return 'invoice';if(t.has('license'))return 'renewal';if(t.has('order')||t.has('equip_upgrade'))return 'order';if(t.has('device'))return 'device';return null}
+function classified(file,fm){const t=tagSet(fm),p=file.path.toLowerCase();if(t.has('ops-project')||t.has('project')&&p.includes('project'))return 'project';if(t.has('invoice')||p.includes('/invoices/'))return 'invoice';if(t.has('license'))return 'renewal';if(t.has('order')||t.has('equip_upgrade')||t.has('equip_ug'))return 'order';if(t.has('device'))return 'device';return null}
 function status(fm){return String(fm.Status??fm.status??'').trim().toLowerCase()}
 function termMonths(fm){const x=Number(fm.Renewal_Term_Months);return Number.isInteger(x)&&x>0?x:null}
 
