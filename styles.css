@@ -4,3 +4,5 @@
 .ops-seat-warning{background:rgba(253,88,88,.10);border-left:3px solid #fd5858}.ops-seat-warning .ops-item-info small{color:#fd5858}.ops-command details>summary{cursor:pointer;font-weight:600;padding:12px 0}.ops-command details>summary:hover{color:var(--text-accent)}
 
 .ops-item-info .ops-seat-action{color:#fd5858;display:block}
+
+.ops-attention-item.ops-upcoming-warning{background:rgba(255,174,82,.10);border-left:3px solid #ffae52}.ops-upcoming-warning .ops-item-info small,.ops-upcoming-warning .ops-item-status{color:#ffae52}
