@@ -1,0 +1,26 @@
+name: Publish Obsidian BRAT Release
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify BRAT assets
+        shell: bash
+        run: |
+          test -s main.js
+          test -s manifest.json
+          test -s styles.css
+          node -e 'const m=require("./manifest.json"); if(!m.id || !m.version) process.exit(1)'
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" main.js manifest.json styles.css --title "Operations Manager $TAG (Beta)" --notes "Experimental Obsidian plugin. Back up your vault before installing. Install via BRAT using theshayneb/operations-manager." --prerelease
