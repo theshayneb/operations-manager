@@ -1,0 +1,20 @@
+name: Publish Operations Manager 0.4.12
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-0412.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check main.js
+          node -e 'if(require("./manifest.json").version!=="0.4.12")process.exit(1)'
+          test -s styles.css
+          gh release create 0.4.12 main.js manifest.json styles.css --target main --title "Operations Manager 0.4.12 (Beta)" --notes "Place the license or agreement name above the agreement types label and Edit agreement types button for all agreement cards." --prerelease
