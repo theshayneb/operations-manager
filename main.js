@@ -23,7 +23,7 @@ const {Plugin,ItemView,Modal,Setting,Notice,normalizePath}=require('obsidian');
 const VIEW='operations-manager-view';
 const dateISO=d=>d.toISOString().slice(0,10);
 function addMonths(iso,months){const [y,m,d]=iso.split('-').map(Number);if(!y||!m||!d)return null;const target=new Date(Date.UTC(y,m-1+months,1));const last=new Date(Date.UTC(target.getUTCFullYear(),target.getUTCMonth()+1,0)).getUTCDate();target.setUTCDate(Math.min(d,last));return dateISO(target)}
-function tagSet(fm,file,app){const values=[fm.tags,fm.Tags,app&&file?app.metadataCache.getFileCache(file)?.tags?.map(t=>t.tag):[]].flatMap(v=>Array.isArray(v)?v:typeof v==='string'?v.split(/[,\s]+/):[]);return new Set(values.map(x=>String(x).trim().replace(/^#/,'').toLowerCase()).filter(Boolean))}
+function tagSet(fm,file,app){const values=[fm.tags].flatMap(v=>Array.isArray(v)?v:typeof v==='string'?v.split(/[,\s]+/):[]);return new Set(values.map(x=>String(x).trim().replace(/^#/,'').toLowerCase()).filter(Boolean))}
 function omTerminated(fm){const value=fm.Termination_Date??fm.termination_date;return value!==undefined&&value!==null&&String(value).trim()!==''&&String(value).trim().toLowerCase()!=='null'}
 function omLicenseAssigned(value){return value===true||String(value??'').trim().toLowerCase()==='checked'}
 function iso(v){if(v instanceof Date)return dateISO(v);if(typeof v==='string')return /^\d{4}-\d{2}-\d{2}$/.test(v)?v:null;return null}
