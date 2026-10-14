@@ -1,0 +1,20 @@
+name: Publish Operations Manager 0.4.79
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-0479.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check main.js
+          node -e 'if(require("./manifest.json").version!=="0.4.79")process.exit(1)'
+          test -s styles.css
+          gh release create 0.4.79 main.js manifest.json styles.css --target main --title "Operations Manager 0.4.79 (Beta)" --notes "Keep license Cost authoritative on all cards, dashboard and settings. Calculated license-type totals are labeled comparison-only. Reduce excess vertical spacing around License details dropdown inside existing license cards." --prerelease
