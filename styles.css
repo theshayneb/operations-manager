@@ -16,3 +16,5 @@
 .ops-attention-item .ops-equipment-note{font-size:12px;line-height:normal}
 
 .ops-stat-icon{display:inline-flex;align-items:center;justify-content:center}.ops-stat-icon svg{width:18px;height:18px}
+
+.ops-stat .ops-stat-icon{align-self:flex-start;justify-content:flex-start}
