@@ -1,0 +1,20 @@
+name: Publish Operations Manager 0.4.82
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-0482.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check main.js
+          node -e 'if(require("./manifest.json").version!=="0.4.82")process.exit(1)'
+          test -s styles.css
+          gh release create 0.4.82 main.js manifest.json styles.css --target main --title "Operations Manager 0.4.82 (Beta)" --notes "Dashboard cards now sort by their actual displayed alert color: red, orange, yellow, green, then no color. Within color groups, sort by earliest relevant renewal or billing date and name. Sorting and rendering share one color calculation, respecting each license's custom alert settings." --prerelease
