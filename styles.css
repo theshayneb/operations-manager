@@ -30,3 +30,28 @@
 .ops-invoice-section>.ops-attention{margin-top:8px}
 
 .ops-license-inline-details{margin-top:6px;font-size:12px}.ops-license-inline-details>summary{cursor:pointer;color:var(--text-muted);font-size:12px}.ops-license-inline-body{padding:9px 0 4px}.ops-license-inline-body table{width:100%;font-size:12px}.ops-license-inline-body th,.ops-license-inline-body td{text-align:left;padding:5px 8px}.ops-license-inline-body button{margin:4px 6px 4px 0}.ops-license-assignees{padding:5px 0;overflow-wrap:anywhere;font-size:12px}
+
+/* Compact Operations Manager Settings: one expandable row per license */
+.ops-settings-licenses{margin-top:22px}
+.ops-settings-licenses>h3{margin-bottom:4px}
+.ops-settings-toolbar{display:flex;align-items:center;gap:12px;margin:16px 0 12px}
+.ops-settings-search{flex:1;min-width:0;max-width:460px}
+.ops-settings-count{font-size:12px;color:var(--text-muted);white-space:nowrap}
+.ops-settings-list{display:flex;flex-direction:column;gap:8px}
+.ops-settings-license{border:1px solid var(--background-modifier-border);border-radius:9px;background:var(--background-secondary);overflow:hidden}
+.ops-settings-license[open]{border-color:var(--background-modifier-border-hover,var(--background-modifier-border))}
+.ops-settings-license-summary{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;cursor:pointer}
+.ops-settings-license-summary:hover{background:var(--background-modifier-hover)}
+.ops-settings-license-name{font-weight:600;flex:1;min-width:130px}
+.ops-settings-license-meta{display:flex;flex-wrap:wrap;gap:8px;color:var(--text-muted);font-size:12px}
+.ops-settings-license-meta>span{padding:3px 7px;background:var(--background-primary);border-radius:5px}
+.ops-settings-license-body{padding:4px 16px 16px;border-top:1px solid var(--background-modifier-border)}
+.ops-settings-actions{display:flex;flex-wrap:wrap;gap:8px;padding:14px 0 4px}
+.ops-settings-group{padding:12px 0;border-bottom:1px solid var(--background-modifier-border)}
+.ops-settings-group:last-child{border-bottom:0}
+.ops-settings-group h4{margin:0 0 6px;font-size:14px}
+.ops-settings-group>.setting-item-description{margin:0 0 8px;font-size:12px}
+.ops-settings-group>.setting-item{padding:9px 0;border-top:0}
+.ops-settings-group>button{margin:5px 8px 4px 0}
+.ops-settings-facts{font-size:12px;color:var(--text-muted);margin:6px 0}
+@media(max-width:600px){.ops-settings-license-summary{align-items:flex-start;flex-direction:column}.ops-settings-license-meta{width:100%}}
