@@ -1,0 +1,20 @@
+name: Publish Operations Manager 0.4.33
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-0433.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check main.js
+          node -e 'if(require("./manifest.json").version!=="0.4.33")process.exit(1)'
+          test -s styles.css
+          gh release create 0.4.33 main.js manifest.json styles.css --target main --title "Operations Manager 0.4.33 (Beta)" --notes "Exclude YAML meeting_notes and call_notes from Dashboard equipment direct scan and empty-state check, matching the general record filters." --prerelease
