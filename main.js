@@ -260,7 +260,7 @@ module.exports=class OperationsManager extends Plugin{
  const schedule=billing.createEl('button',{text:'Edit billing schedule'});schedule.onclick=()=>new OMBillingModal(this.app,this,license).open();const contractDate=billing.createEl('button',{text:renewal?'Edit renewal date':'Set contract renewal date'});contractDate.onclick=()=>new OMContractDateModal(this.app,this,license).open();
  const seats=body.createDiv({cls:'ops-settings-group'});seats.createEl('h4',{text:'Seats & assignments'});
  if(hasTypes||/nextiva/i.test(license.file.basename)){
- if(hasTypes)seats.createEl('p',{cls:'ops-settings-facts',text:multi.length+' license types · '+bought+' purchased · '+used+' assigned · '+available+' available'});
+ if(hasTypes){seats.createEl('p',{cls:'ops-settings-facts',text:multi.length+' license types · '+bought+' purchased · '+used+' assigned · '+available+' available'});for(const t of multi)seats.createEl('p',{cls:'ops-settings-facts',text:t.name+' → '+(t.field||'Nextiva_Licenses')});}
  else seats.createEl('p',{cls:'ops-settings-facts',text:'No license types configured yet. Add each Nextiva license type, its monthly price, and purchased seat count.'});
  const typeBtn=seats.createEl('button',{text:hasTypes?'Manage license types':'Add license types'});typeBtn.onclick=()=>new OMNextivaTypesModal(this.app,this,license).open();
  if(hasTypes){const employeeBtn=seats.createEl('button',{text:'Assign employee licenses'});employeeBtn.onclick=()=>new OMNextivaAssignmentsModal(this.app,this,license).open();}
