@@ -6,3 +6,5 @@
 .ops-item-info .ops-seat-action{color:#fd5858;display:block}
 
 .ops-attention-item.ops-upcoming-warning{background:rgba(255,174,82,.10);border-left:3px solid #ffae52}.ops-upcoming-warning .ops-item-info small,.ops-upcoming-warning .ops-item-status{color:#ffae52}
+
+.ops-equipment-heading{font-size:1.65em;margin-top:24px;margin-bottom:14px}.ops-equipment-phase{border:1px solid var(--background-modifier-border);border-radius:10px;padding:14px 16px;margin:12px 0;background:var(--background-secondary)}.ops-equipment-phase>summary{cursor:pointer;font-weight:700;font-size:1.1em;padding:4px 0}.ops-equipment-list{display:grid;gap:12px;padding-top:12px}.ops-equipment-card{padding:18px 20px;min-height:86px;border:1px solid var(--background-modifier-border);border-left:4px solid var(--interactive-accent);border-radius:9px;background:var(--background-primary);box-shadow:0 2px 7px rgba(0,0,0,.08)}.ops-equipment-properties{margin-top:8px;font-size:.9em}.ops-equipment-properties>summary{cursor:pointer;color:var(--text-muted)}.ops-equipment-properties>div{padding:3px 0;overflow-wrap:anywhere}.ops-equipment-controls{margin:8px 0 14px}
