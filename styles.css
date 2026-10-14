@@ -57,3 +57,11 @@
 @media(max-width:600px){.ops-settings-license-summary{align-items:flex-start;flex-direction:column}.ops-settings-license-meta{width:100%}}
 
 .ops-settings-icon-section{margin:14px 0 18px;border:1px solid var(--background-modifier-border);border-radius:8px;padding:10px 14px}.ops-settings-icon-section>summary{cursor:pointer;font-weight:600}.ops-settings-icon-section>.setting-item-description{font-size:12px;margin:10px 0}.ops-settings-icon-section>.setting-item{padding:9px 0}
+
+/* Keep license-card disclosure immediately below its summary, without the
+   generic dashboard accordion's 12px vertical summary padding. */
+.ops-command .ops-attention-item .ops-license-inline-details{margin:0;font-size:12px;width:100%}
+.ops-command .ops-attention-item .ops-license-inline-details>summary{padding:2px 0!important;margin:0!important;line-height:1.35;font-weight:500;color:var(--text-muted);cursor:pointer}
+.ops-command .ops-attention-item .ops-license-inline-body{padding:6px 0 2px}
+.ops-command .ops-attention-item .ops-item-info{gap:3px}
+.ops-command .ops-attention-item .ops-license-summary{line-height:1.35}
