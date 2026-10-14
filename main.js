@@ -91,6 +91,7 @@ class OMLinkModal extends Modal{
 
 function omRenewalAlertsEnabled(fm){return fm.Renewal_Alerts!==false&&String(fm.Renewal_Alerts??'').toLowerCase()!=='false'}
 function omBillingAlertsEnabled(fm){return fm.Billing_Alerts!==false&&String(fm.Billing_Alerts??'').toLowerCase()!=='false'}
+function omTracksSeats(fm){const raw=fm.Agreement_Types??fm.Agreement_Type??fm.License_Type??[];const kinds=(Array.isArray(raw)?raw:String(raw).split(',')).map(v=>String(v).trim().toLowerCase()).filter(Boolean);if(kinds.length)return kinds.some(v=>['software seats','software seat','seat','seats','software','per-user','per user'].includes(v));return omNextivaTypes(fm).length>0||fm.License_Seats!==undefined&&fm.License_Seats!==null&&String(fm.License_Seats).trim()!==''}
 function omSeatAlertsEnabled(fm){return fm.Seat_Alerts!==false&&String(fm.Seat_Alerts??'').toLowerCase()!=='false'}
 function omRenewalEstimate(fm){const raw=fm.Cost;const amount=typeof raw==='number'?raw:Number(String(raw??'').trim().replace(/[$,]/g,''));if(raw===null||raw===undefined||String(raw).trim()===''||!Number.isFinite(amount)||amount<0)return null;return {amount:Math.round((amount+Number.EPSILON)*100)/100}}
 function omBillingCycle(fm){const value=String(fm.Billing??'').trim().toLowerCase();const months={'monthly':1,'month':1,'quarterly':3,'quarter':3,'annually':12,'annual':12,'yearly':12,'year':12,'semiannually':6,'semi-annually':6,'semiannual':6,'biannually':6,'biannual':6};return Object.prototype.hasOwnProperty.call(months,value)?{months:months[value],label:value.charAt(0).toUpperCase()+value.slice(1)}:null}
@@ -115,8 +116,10 @@ class OperationsView extends ItemView{
  const available=purchased===null?null:purchased-assigned;
  const amount=omRenewalEstimate(r.fm)?.amount??null;
  const period=omBillingCycle(r.fm)?.label?.toLowerCase()??'billing cycle';
- const line=purchased===null?'Purchased seats not set':purchased+' purchased · '+assigned+' assigned · '+available+' available';
- info.createEl('small',{cls:'ops-license-summary',text:line+(amount===null?'':' · '+omUSD(amount)+' / '+period)});
+ const seatBased=omTracksSeats(r.fm);
+ const line=seatBased?(purchased===null?'Purchased seats not set':purchased+' purchased · '+assigned+' assigned · '+available+' available'):'';
+ const costLine=amount===null?'':omUSD(amount)+' / '+period;
+ if(line||costLine)info.createEl('small',{cls:'ops-license-summary',text:[line,costLine].filter(Boolean).join(' · ')});
  const key='licenses:inline:'+r.file.path;
  const details=info.createEl('details',{cls:'ops-license-inline-details'});
  details.open=plugin.settings.collapsedSections?.[key]===true;
@@ -145,7 +148,7 @@ class OperationsView extends ItemView{
  edit.onclick=()=>new OMNextivaTypesModal(this.app,plugin,r).open();
  const assign=content.createEl('button',{text:'Manage assignments'});
  assign.onclick=()=>new OMNextivaAssignmentsModal(this.app,plugin,r).open();
- }else{
+ }else if(seatBased){
  if(amount!==null&&purchased!==null&&purchased>0)content.createEl('p',{text:'Derived average per purchased seat: '+omUSD(amount/purchased)+' / '+period});
  const employees=inv.employees.filter(e=>Object.entries(e.fm).some(([field,value])=>field.toLowerCase()===inv.field.toLowerCase()&&omLicenseAssigned(value)));
  content.createEl('p',{text:'Assigned employees: '+employees.length});
@@ -229,7 +232,7 @@ module.exports=class OperationsManager extends Plugin{
  const list=section.createDiv({cls:'ops-settings-list'});
  const show=()=>{list.empty();const filtered=records.filter(r=>r.file.basename.toLowerCase().includes(search.value.trim().toLowerCase()));count.setText(filtered.length+' of '+records.length);if(!filtered.length){list.createEl('p',{cls:'setting-item-description',text:'No matching licenses.'});return}
  for(const license of filtered){
- const inv=this.licenseInventory(license),multi=omNextivaTypes(license.fm),hasTypes=multi.length>0;
+ const inv=this.licenseInventory(license),multi=omNextivaTypes(license.fm),hasTypes=multi.length>0,seatBased=omTracksSeats(license.fm);
  const summary=hasTypes?omNextivaSummary(this,license):null;
  const bought=hasTypes?summary.rows.reduce((n,x)=>n+x.purchased,0):inv.total;
  const used=hasTypes?summary.rows.reduce((n,x)=>n+x.assigned,0):inv.assigned;
@@ -243,7 +246,7 @@ module.exports=class OperationsManager extends Plugin{
  const head=details.createEl('summary',{cls:'ops-settings-license-summary'});
  const heading=head.createSpan({cls:'ops-settings-license-name',text:license.file.basename});
  const chips=head.createSpan({cls:'ops-settings-license-meta'});
- if(bought!==null)chips.createSpan({text:available+' available / '+bought+' purchased'});
+ if(seatBased&&bought!==null)chips.createSpan({text:available+' available / '+bought+' purchased'});
  if(charge!==null)chips.createSpan({text:omUSD(charge)+' / '+frequency});
  const body=details.createDiv({cls:'ops-settings-license-body'});
  const actions=body.createDiv({cls:'ops-settings-actions'});
@@ -261,6 +264,7 @@ module.exports=class OperationsManager extends Plugin{
  billing.createEl('p',{cls:'ops-settings-facts',text:'Billing: '+(current?.label??'Not set')+' · Next charge: '+(next??'Not set')+' · Renewal: '+(renewal?.date??'Not set')});
  if(charge!==null)billing.createEl('p',{cls:'ops-settings-facts',text:'Expected charge: '+omUSD(charge)+' / '+frequency});
  const schedule=billing.createEl('button',{text:'Edit billing schedule'});schedule.onclick=()=>new OMBillingModal(this.app,this,license).open();const contractDate=billing.createEl('button',{text:renewal?'Edit renewal date':'Set contract renewal date'});contractDate.onclick=()=>new OMContractDateModal(this.app,this,license).open();
+ if(seatBased||/nextiva/i.test(license.file.basename)){
  const seats=body.createDiv({cls:'ops-settings-group'});seats.createEl('h4',{text:'Seats & assignments'});
  if(hasTypes||/nextiva/i.test(license.file.basename)){
  if(hasTypes){seats.createEl('p',{cls:'ops-settings-facts',text:multi.length+' license types · '+bought+' purchased · '+used+' assigned · '+available+' available · Calculated subtotal: '+omUSD(summary.total)+' (not recorded Cost)'});for(const t of multi)seats.createEl('p',{cls:'ops-settings-facts',text:t.name+' → '+(t.field||'Nextiva_Licenses')});}
@@ -271,6 +275,7 @@ module.exports=class OperationsManager extends Plugin{
  seats.createEl('p',{cls:'ops-settings-facts',text:(bought===null?'Purchased seats not set':bought+' purchased · '+used+' assigned · '+available+' available')});
  const set=seats.createEl('button',{text:'Set purchased seats'});set.onclick=()=>new OMSeatCountModal(this.app,this,license).open();
  seats.createEl('p',{cls:'ops-settings-facts',text:'Employee property: '+this.licenseField(license)});const fieldButton=seats.createEl('button',{text:'Choose employee property'});fieldButton.onclick=()=>new OMLicenseFieldModal(this.app,this,license).open();const manage=seats.createEl('button',{text:'Manage employees'});manage.onclick=()=>new OMEmployeeLicenseModal(this.app,this,license,inv.employees).open();
+ }
  }
  }}
  search.addEventListener('input',show);show();
