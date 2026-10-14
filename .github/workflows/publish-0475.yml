@@ -1,0 +1,20 @@
+name: Publish Operations Manager 0.4.75
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-0475.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check main.js
+          node -e 'if(require("./manifest.json").version!=="0.4.75")process.exit(1)'
+          test -s styles.css
+          gh release create 0.4.75 main.js manifest.json styles.css --target main --title "Operations Manager 0.4.75 (Beta)" --notes "Redesign Obsidian Settings for clarity: searchable compact license list, collapsible vendor settings with concise billing and seat summaries, grouped Dashboard alert toggles, billing and seat controls, optional icon picker collapsed under General. Existing functionality and note frontmatter preserved." --prerelease
