@@ -19,7 +19,7 @@
 
 .ops-stat .ops-stat-icon{align-self:flex-start;justify-content:flex-start}
 
-.ops-attention-item.ops-distant-renewal{background:rgba(254,250,113,.10);border-left:3px solid #fefa71}
-.ops-distant-renewal .ops-item-info small,.ops-distant-renewal .ops-item-status{color:#fefa71}
+.ops-attention-item.ops-distant-renewal{background:rgba(255,235,102,.10);border-left:3px solid #ffeb66}
+.ops-distant-renewal .ops-item-info small,.ops-distant-renewal .ops-item-status{color:#ffeb66}
 .ops-seat-moderate{background:rgba(255,174,82,.10);border-left:3px solid #ffae52}
 .ops-seat-moderate .ops-item-info small{color:#ffae52}
