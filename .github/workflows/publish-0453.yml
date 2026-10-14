@@ -1,0 +1,20 @@
+name: Publish Operations Manager 0.4.53
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-0453.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check main.js
+          node -e 'if(require("./manifest.json").version!=="0.4.53")process.exit(1)'
+          test -s styles.css
+          gh release create 0.4.53 main.js manifest.json styles.css --target main --title "Operations Manager 0.4.53 (Beta)" --notes "Remove generic Device label from Dashboard cards; show Employee only when populated and Follow up only for follow-up cards." --prerelease
