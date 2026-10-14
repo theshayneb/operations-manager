@@ -65,3 +65,19 @@
 .ops-command .ops-attention-item .ops-license-inline-body{padding:6px 0 2px}
 .ops-command .ops-attention-item .ops-item-info{gap:3px}
 .ops-command .ops-attention-item .ops-license-summary{line-height:1.35}
+
+/* Per-license Dashboard colors: overrides global threshold classes without
+   affecting invoices or equipment. */
+.ops-attention-item.ops-alert-red{background:rgba(253,88,88,.10);border-left:3px solid #fd5858}
+.ops-attention-item.ops-alert-orange{background:rgba(255,174,82,.10);border-left:3px solid #ffae52}
+.ops-attention-item.ops-alert-yellow{background:rgba(255,235,102,.10);border-left:3px solid #ffeb66}
+.ops-attention-item.ops-alert-green{background:rgba(60,175,115,.10);border-left:3px solid #3caf73}
+.ops-alert-red .ops-item-info small,.ops-alert-red .ops-item-status,.ops-alert-red .ops-seat-action{color:#fd5858!important}
+.ops-alert-orange .ops-item-info small,.ops-alert-orange .ops-item-status,.ops-alert-orange .ops-seat-action{color:#ffae52!important}
+.ops-alert-yellow .ops-item-info small,.ops-alert-yellow .ops-item-status,.ops-alert-yellow .ops-seat-action{color:#ffeb66!important}
+.ops-alert-green .ops-item-info small,.ops-alert-green .ops-item-status,.ops-alert-green .ops-seat-action{color:#3caf73!important}
+.ops-alert-rule-group{padding:12px 0;border-bottom:1px solid var(--background-modifier-border)}
+.ops-alert-rule-group h3{margin:3px 0 5px}
+.ops-alert-rule-group .setting-item{padding:9px 0}
+.ops-alert-rule-group .setting-item-control input{max-width:100px}
+.ops-alert-rule-group .setting-item-control{gap:8px}
