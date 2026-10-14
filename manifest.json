@@ -1,7 +1,7 @@
 {
   "id": "operations-manager",
   "name": "Operations Manager",
-  "version": "0.4.78",
+  "version": "0.4.79",
   "minAppVersion": "1.5.0",
   "description": "A lightweight operations dashboard and guided workflows for existing Markdown notes.",
   "author": "Custom prototype",
