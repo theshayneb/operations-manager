@@ -1,0 +1,20 @@
+name: Publish Operations Manager 0.4.32
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-0432.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check main.js
+          node -e 'if(require("./manifest.json").version!=="0.4.32")process.exit(1)'
+          test -s styles.css
+          gh release create 0.4.32 main.js manifest.json styles.css --target main --title "Operations Manager 0.4.32 (Beta)" --notes "Move Equipment by Phase below main Dashboard alert cards, preserving YAML equip_ug and incomplete-status rules." --prerelease
