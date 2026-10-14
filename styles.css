@@ -81,3 +81,11 @@
 .ops-alert-rule-group .setting-item{padding:9px 0}
 .ops-alert-rule-group .setting-item-control input{max-width:100px}
 .ops-alert-rule-group .setting-item-control{gap:8px}
+
+/* Each active event explains its own severity; inactive financial information
+   is no longer rendered on Dashboard alert cards. */
+.ops-command .ops-item-info .ops-active-alert{display:block;line-height:1.45}
+.ops-command .ops-item-info .ops-active-alert-red{color:#fd5858!important}
+.ops-command .ops-item-info .ops-active-alert-orange{color:#ffae52!important}
+.ops-command .ops-item-info .ops-active-alert-yellow{color:#ffeb66!important}
+.ops-command .ops-item-info .ops-active-alert-green{color:#3caf73!important}
