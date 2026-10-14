@@ -1,0 +1,20 @@
+name: Publish Operations Manager 0.4.74
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-0474.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check main.js
+          node -e 'if(require("./manifest.json").version!=="0.4.74")process.exit(1)'
+          test -s styles.css
+          gh release create 0.4.74 main.js manifest.json styles.css --target main --title "Operations Manager 0.4.74 (Beta)" --notes "Remove unnecessary per-license renewal warning window; keep independent Renewal, Upcoming charge, and Seat alert switches. Continue using established Dashboard red/orange/yellow 90-day renewal warning system." --prerelease
