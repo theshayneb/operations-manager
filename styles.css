@@ -12,3 +12,5 @@
 .ops-equipment-card .ops-equipment-note,.ops-equipment-card .ops-equipment-replace{font-size:12px;line-height:normal}
 
 .ops-icon-preview{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-right:8px;vertical-align:middle}.ops-icon-preview svg,.ops-item-icon svg{width:18px;height:18px}.ops-icon-suggestion{display:flex;align-items:center;gap:8px}.ops-item-icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+
+.ops-attention-item .ops-equipment-note{font-size:12px;line-height:normal}
