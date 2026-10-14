@@ -120,6 +120,7 @@ class OperationsView extends ItemView{
  const line=seatBased?(purchased===null?'Purchased seats not set':purchased+' purchased · '+assigned+' assigned · '+available+' available'):'';
  const costLine=amount===null?'':omUSD(amount)+' / '+period;
  if(line||costLine)info.createEl('small',{cls:'ops-license-summary',text:[line,costLine].filter(Boolean).join(' · ')});
+ if(!seatBased&&!/nextiva/i.test(r.file.basename))return;
  const key='licenses:inline:'+r.file.path;
  const details=info.createEl('details',{cls:'ops-license-inline-details'});
  details.open=plugin.settings.collapsedSections?.[key]===true;
