@@ -121,6 +121,8 @@ function xlsxWorkbook(columns, records) {
 }
 const { Plugin, ItemView, Modal, Setting, Notice, normalizePath } = require("obsidian");
 const VIEW = "operations-manager-view";
+// The loaded plugin settings, for helpers that only receive a note's frontmatter.
+let OM_SETTINGS = null;
 const dateISO = (d) => d.toISOString().slice(0, 10);
 function addMonths(iso, months) {
   const [y, m, d] = iso.split("-").map(Number);
@@ -220,14 +222,15 @@ function omLinkValue(v) {
   if (Array.isArray(v)) return omLinkValue(v[0]);
   if (typeof v === "object") return String(v.path ?? v.link ?? "");
   return String(v)
-    .replace(/^\\[\\[/,'').replace(/\\]\\]$/, "")
+    .replace(/^\[\[/, "")
+    .replace(/\]\]$/, "")
     .split("|")[0]
     .trim();
 }
 function omKey(v) {
   return omLinkValue(v)
-    .replace(/\\\\/g, "/")
-    .replace(/\\.md$/i, "")
+    .replace(/\\/g, "/")
+    .replace(/\.md$/i, "")
     .toLowerCase();
 }
 function omMatches(ref, file) {
@@ -247,15 +250,23 @@ class OMDeviceWorkflowModal extends Modal {
     this.plugin = plugin;
     this.record = record;
     const fm = record.fm;
-    this.status = String(fm.Status ?? fm.status ?? "in progress");
-    this.employee = Array.isArray(fm.Employee)
-      ? fm.Employee.map(String).join(", ")
-      : String(fm.Employee ?? fm.Assigned_To ?? "");
-    this.serial = String(fm.Serial_Number ?? fm.Serial ?? "");
-    this.model = String(fm.Device_Model ?? fm.Model ?? "");
+    const text = (v) => (v == null ? "" : Array.isArray(v) ? v.map(String).join(", ") : String(v));
+    this.status = text(fm.Status ?? fm.status) || "in progress";
+    this.employee = text(fm.Employee ?? fm.Assigned_To);
+    this.serial = text(fm.Serial_Number ?? fm.Serial);
+    this.model = text(fm.Device_Model ?? fm.Model);
     this.orderDate = iso(fm.Ordered ?? fm.Order_Date) ?? "";
     this.received = iso(fm.Set_Up ?? fm.Set_up) ?? "";
     this.oldReturned = !!fm.Old_Device_Returned;
+    this.initial = {
+      status: this.status,
+      employee: this.employee,
+      serial: this.serial,
+      model: this.model,
+      orderDate: this.orderDate,
+      received: this.received,
+      oldReturned: this.oldReturned,
+    };
   }
   onOpen() {
     const c = this.contentEl;
@@ -273,15 +284,9 @@ class OMDeviceWorkflowModal extends Modal {
     const current = this.status;
     new Setting(c)
       .setName("Status")
-      .setDesc("Uses the existing Status property; no Order_Status field.")
+      .setDesc("Only the fields you change are saved to the note.")
       .addDropdown((d) => {
         for (const option of [...new Set([...choices, current])]) d.addOption(option, option);
-        this.status =
-          this.received && current === "in progress"
-            ? "delivered"
-            : this.orderDate && current === "in progress"
-              ? "ordered"
-              : current;
         d.setValue(this.status);
         d.onChange((v) => (this.status = v));
       });
@@ -312,22 +317,30 @@ class OMDeviceWorkflowModal extends Modal {
               return;
             }
           try {
+            const before = this.initial;
             await this.app.fileManager.processFrontMatter(this.record.file, (fm) => {
-              fm.Status = this.status;
-              delete fm.Order_Status;
-              if (Object.prototype.hasOwnProperty.call(fm, "Employee"))
-                fm.Employee = Array.isArray(fm.Employee)
-                  ? this.employee
+              // Only write what changed, under the property name the note already uses. Names are
+              // listed in the order they are read; new properties use the short name.
+              const has = (k) => Object.prototype.hasOwnProperty.call(fm, k);
+              const set = (names, value, old, fallback = names[0]) => {
+                if (value === old) return;
+                const k = names.find(has) ?? fallback;
+                if (value === "" && !has(k)) return;
+                fm[k] = Array.isArray(fm[k])
+                  ? value
                       .split(",")
                       .map((x) => x.trim())
                       .filter(Boolean)
-                  : this.employee;
-              else fm.Employee = this.employee;
-              fm.Device_Model = this.model;
-              fm.Serial_Number = this.serial;
-              fm.Ordered = this.orderDate;
-              fm.Set_Up = this.received;
-              fm.Old_Device_Returned = this.oldReturned;
+                  : value;
+              };
+              set(["Status", "status"], this.status, before.status);
+              set(["Employee", "Assigned_To"], this.employee, before.employee);
+              set(["Device_Model", "Model"], this.model, before.model, "Model");
+              set(["Serial_Number", "Serial"], this.serial, before.serial, "Serial");
+              set(["Ordered", "Order_Date"], this.orderDate, before.orderDate);
+              set(["Set_Up", "Set_up"], this.received, before.received);
+              if (this.oldReturned !== before.oldReturned) fm.Old_Device_Returned = this.oldReturned;
+              delete fm.Order_Status;
             });
             new Notice("Equipment workflow updated");
             this.close();
@@ -367,7 +380,9 @@ class OMEmployeeLicenseModal extends Modal {
         a.file.basename.localeCompare(b.file.basename, undefined, { sensitivity: "base", numeric: true }),
       );
     for (const e of matching) {
-      const active = omLicenseAssigned(e.fm[field]);
+      const active = Object.entries(e.fm).some(
+        ([k, v]) => k.toLowerCase() === field.toLowerCase() && omLicenseAssigned(v),
+      );
       new Setting(c)
         .setName(e.file.basename)
         .setDesc(active ? "Assigned" : "Not assigned")
@@ -382,9 +397,11 @@ class OMEmployeeLicenseModal extends Modal {
                 }
               }
               await this.app.fileManager.processFrontMatter(e.file, (fm) => {
-                fm[field] = active ? false : true;
+                // Reuse the employee's existing checkbox (any capitalisation) instead of adding a second one.
+                const key = Object.keys(fm).find((k) => k.toLowerCase() === field.toLowerCase()) ?? field;
+                fm[key] = !active;
+                e.fm = { ...e.fm, [key]: !active };
               });
-              e.fm[field] = active ? false : true;
               this.plugin.refresh();
               this.render();
             } catch (err) {
@@ -664,19 +681,21 @@ class OMNextivaAssignmentsModal extends Modal {
               for (const type of summary.rows) {
                 const enabled = selected.has(type.name.toLowerCase());
                 if (type.field) {
-                  const key =
-                    Object.keys(fm).find((k) => k.toLowerCase() === type.field.toLowerCase()) ?? type.field;
-                  fm[key] = enabled;
+                  const key = Object.keys(fm).find((k) => k.toLowerCase() === type.field.toLowerCase());
+                  if (key) fm[key] = enabled;
+                  else if (enabled) fm[type.field] = true;
                 } else {
                   if (enabled) unmapped.add(type.name.toLowerCase());
                   else unmapped.delete(type.name.toLowerCase());
                 }
               }
               const previouslyNamed = new Map(current.map((x) => [x.toLowerCase(), x]));
-              fm.Nextiva_Licenses = [...unmapped].map(
+              const named = [...unmapped].map(
                 (x) =>
                   previouslyNamed.get(x) ?? summary.rows.find((t) => t.name.toLowerCase() === x)?.name ?? x,
               );
+              if (named.length) fm.Nextiva_Licenses = named;
+              else delete fm.Nextiva_Licenses;
             });
             const updated = this.app.metadataCache.getFileCache(employee.file)?.frontmatter;
             employee.fm = updated ?? employee.fm;
@@ -1061,11 +1080,18 @@ function omSeatCount(plugin, r) {
     ? omNextivaSummary(plugin, r).rows.reduce((sum, v) => sum + v.available, 0)
     : plugin.licenseInventory(r).available;
 }
-function omRenewalAlertsEnabled(fm) {
-  return fm.Renewal_Alerts !== false && String(fm.Renewal_Alerts ?? "").toLowerCase() !== "false";
+// Alert switches are kept in the plugin settings. A Renewal_Alerts / Billing_Alerts / Seat_Alerts
+// property written to a note by older versions is still honoured until the switch is changed.
+function omAlertSwitch(fm, file, kind, field) {
+  const saved = file ? OM_SETTINGS?.licenseAlerts?.[file.path]?.[kind] : undefined;
+  if (typeof saved === "boolean") return saved;
+  return fm[field] !== false && String(fm[field] ?? "").toLowerCase() !== "false";
 }
-function omBillingAlertsEnabled(fm) {
-  return fm.Billing_Alerts !== false && String(fm.Billing_Alerts ?? "").toLowerCase() !== "false";
+function omRenewalAlertsEnabled(fm, file) {
+  return omAlertSwitch(fm, file, "renewal", "Renewal_Alerts");
+}
+function omBillingAlertsEnabled(fm, file) {
+  return omAlertSwitch(fm, file, "billing", "Billing_Alerts");
 }
 function omTracksSeats(fm) {
   const raw = fm.Agreement_Types ?? fm.Agreement_Type ?? fm.License_Type ?? [];
@@ -1081,8 +1107,8 @@ function omTracksSeats(fm) {
     fm.License_Seats !== undefined && fm.License_Seats !== null && String(fm.License_Seats).trim() !== ""
   );
 }
-function omSeatAlertsEnabled(fm) {
-  return fm.Seat_Alerts !== false && String(fm.Seat_Alerts ?? "").toLowerCase() !== "false";
+function omSeatAlertsEnabled(fm, file) {
+  return omAlertSwitch(fm, file, "seats", "Seat_Alerts");
 }
 function omRenewalEstimate(fm) {
   const raw = fm.Cost;
@@ -1189,14 +1215,14 @@ function omDashboardAction(r, plugin) {
   if (r.kind === "renewal") {
     const renewal = omMonthToMonth(fm, r.file) ? null : inferredRenewal(fm);
     const renewalDays = renewal ? daysUntil(renewal.date) : null;
-    const renewalDue = omRenewalAlertsEnabled(fm) && !!omAlertColor(plugin, r.file, "renewal", renewalDays);
-    const billing = omBillingAlertsEnabled(fm) ? omBillingInfo(fm) : null;
+    const renewalDue = omRenewalAlertsEnabled(fm, r.file) && !!omAlertColor(plugin, r.file, "renewal", renewalDays);
+    const billing = omBillingAlertsEnabled(fm, r.file) ? omBillingInfo(fm) : null;
     const billingDue = billing && !!omAlertColor(plugin, r.file, "billing", billing.days);
     const urgency = (d) => (d < 0 ? 0 : d <= 14 ? 10 : d <= 30 ? 30 : 45);
     const preferBilling = billingDue && (!renewalDue || billing.date < renewal.date);
     const seatDue =
       omTracksSeats(fm) &&
-      omSeatAlertsEnabled(fm) &&
+      omSeatAlertsEnabled(fm, r.file) &&
       !!omAlertColor(plugin, r.file, "seats", omSeatCount(plugin, r));
     const label = preferBilling
       ? "Upcoming charge · " +
@@ -1229,7 +1255,7 @@ function omLicenseActiveAlerts(plugin, r) {
   const fm = r.fm,
     alerts = [];
   const renewal = omMonthToMonth(fm, r.file) ? null : inferredRenewal(fm);
-  if (renewal && omRenewalAlertsEnabled(fm)) {
+  if (renewal && omRenewalAlertsEnabled(fm, r.file)) {
     const days = daysUntil(renewal.date),
       color = omAlertColor(plugin, r.file, "renewal", days);
     if (color)
@@ -1244,7 +1270,7 @@ function omLicenseActiveAlerts(plugin, r) {
           (days < 0 ? "Overdue " + -days + " days" : days + " days remaining"),
       });
   }
-  const billing = omBillingAlertsEnabled(fm) ? omBillingInfo(fm) : null;
+  const billing = omBillingAlertsEnabled(fm, r.file) ? omBillingInfo(fm) : null;
   if (billing) {
     const color = omAlertColor(plugin, r.file, "billing", billing.days);
     if (color)
@@ -1260,7 +1286,7 @@ function omLicenseActiveAlerts(plugin, r) {
           (billing.amount === null ? "" : " · " + omUSD(billing.amount)),
       });
   }
-  if (omTracksSeats(fm) && omSeatAlertsEnabled(fm)) {
+  if (omTracksSeats(fm) && omSeatAlertsEnabled(fm, r.file)) {
     const available = omSeatCount(plugin, r),
       color = omAlertColor(plugin, r.file, "seats", available);
     if (color) {
@@ -1724,7 +1750,7 @@ class OperationsView extends ItemView {
           (r) =>
             r.kind === "renewal" &&
             omTracksSeats(r.fm) &&
-            omSeatAlertsEnabled(r.fm) &&
+            omSeatAlertsEnabled(r.fm, r.file) &&
             !!omAlertColor(this.plugin, r.file, "seats", omSeatCount(this.plugin, r)),
         )
       : [];
@@ -1829,7 +1855,7 @@ class OperationsView extends ItemView {
             });
         } else if (
           r.attention &&
-          omRenewalAlertsEnabled(r.fm) &&
+          omRenewalAlertsEnabled(r.fm, r.file) &&
           !omMonthToMonth(r.fm, r.file) &&
           !inferredRenewal(r.fm)
         )
@@ -1856,7 +1882,7 @@ class OperationsView extends ItemView {
       if (
         dashboard &&
         r.kind === "renewal" &&
-        omBillingAlertsEnabled(r.fm) &&
+        omBillingAlertsEnabled(r.fm, r.file) &&
         omBillingInfo(r.fm) &&
         !!omAlertColor(this.plugin, r.file, "billing", omBillingInfo(r.fm).days)
       ) {
@@ -1865,7 +1891,7 @@ class OperationsView extends ItemView {
       }
       if (
         r.kind === "renewal" &&
-        omRenewalAlertsEnabled(r.fm) &&
+        omRenewalAlertsEnabled(r.fm, r.file) &&
         inferredRenewal(r.fm) &&
         !omMonthToMonth(r.fm, r.file) &&
         !!omAlertColor(this.plugin, r.file, "renewal", daysUntil(inferredRenewal(r.fm).date))
@@ -2221,16 +2247,9 @@ class OMRecordChargeModal extends Modal {
             await this.app.fileManager.processFrontMatter(this.record.file, (fm) => {
               if (iso(fm.Next_Billing) !== current.date)
                 throw Error("Billing date changed; reopen this dialog");
-              const history = Array.isArray(fm.Billing_History)
-                ? fm.Billing_History
-                : fm.Billing_History
-                  ? [fm.Billing_History]
-                  : [];
-              if (!history.some((v) => iso(v) === current.date)) history.push(current.date);
-              fm.Billing_History = history;
-              fm.Last_Billed = current.date;
               fm.Next_Billing = next;
             });
+            await this.plugin.addHistory(this.record.file, "billing", current.date);
             this.record.fm.Next_Billing = next;
             this.close();
             this.plugin.refresh();
@@ -2287,7 +2306,9 @@ class RenewModal extends Modal {
     c.createEl("p", { text: "Current renewal: " + old + (current.estimated ? " (estimated)" : "") });
     c.createEl("p", { text: "Next renewal after completion: " + next });
     c.createEl("p", {
-      text: "This preserves Ordered, appends the current renewal to history, and creates a follow-up task in this note.",
+      text:
+        "This sets Next_Renewal in the note and keeps the completed date in the plugin's renewal history." +
+        (this.plugin.settings.renewalFollowUpTask ? " A follow-up task is added to the end of the note." : ""),
     });
     new Setting(c).addButton((b) =>
       b
@@ -2298,22 +2319,19 @@ class RenewModal extends Modal {
             await this.app.fileManager.processFrontMatter(this.file, (fm) => {
               const check = inferredRenewal(fm);
               if (!check || check.date !== old) throw Error("Renewal date changed; reopen this dialog");
-              const history = Array.isArray(fm.Renewal_History)
-                ? fm.Renewal_History
-                : fm.Renewal_History
-                  ? [fm.Renewal_History]
-                  : [];
-              if (!history.some((v) => iso(v) === old)) history.push(old);
-              fm.Renewal_History = history;
-              fm.Last_Renewed = old;
               fm.Next_Renewal = next;
-              fm.Renewal_Review_Required = false;
             });
-            const note = await this.app.vault.read(this.file);
-            const task = "- [ ] Review renewal for " + this.file.basename + " 📅 " + next;
-            if (!note.includes(task))
-              await this.app.vault.append(this.file, "\\n## Renewal follow-up\\n" + task + "\\n");
-            new Notice("Renewal completed; history, next date and reminder saved");
+            await this.plugin.addHistory(this.file, "renewal", old);
+            if (this.plugin.settings.renewalFollowUpTask) {
+              const note = await this.app.vault.read(this.file);
+              const task = "- [ ] Review renewal for " + this.file.basename + " 📅 " + next;
+              if (!note.includes(task))
+                await this.app.vault.append(
+                  this.file,
+                  (note.endsWith("\n") ? "" : "\n") + "\n## Renewal follow-up\n" + task + "\n",
+                );
+            }
+            new Notice("Renewal completed; next renewal date saved");
             this.close();
             this.plugin.refresh();
           } catch (e) {
@@ -2430,7 +2448,7 @@ class OMIconPicker extends require("obsidian").SuggestModal {
     this.icons = ["none", ...require("obsidian").getIconIds().sort()];
   }
   getSuggestions(query) {
-    const q = query.trim().toLowerCase().replace(/\\s+/g, "-");
+    const q = query.trim().toLowerCase().replace(/\s+/g, "-");
     return this.icons.filter((id) => id.includes(q)).slice(0, 100);
   }
   renderSuggestion(id, el) {
@@ -2478,10 +2496,20 @@ module.exports = class OperationsManager extends Plugin {
       ctx.addChild(new OMEmbeddedDashboard(el, this));
     });
     this.settings = Object.assign(
-      { folder: "Operations Records", renewalWarningDays: 90, cardIcons: {}, collapsedSections: {} },
+      {
+        folder: "Operations Records",
+        renewalWarningDays: 90,
+        cardIcons: {},
+        collapsedSections: {},
+        licenseAlerts: {},
+        licenseHistory: {},
+        typeFolders: {},
+        renewalFollowUpTask: false,
+      },
       await this.loadData(),
     );
     this.settings.renewalWarningDays = 90;
+    OM_SETTINGS = this.settings;
     this.registerView(VIEW, (leaf) => new OperationsView(leaf, this));
     this.addRibbonIcon("layout-dashboard", "Open Operations Manager", () => this.activate());
     this.addCommand({
@@ -2502,6 +2530,17 @@ module.exports = class OperationsManager extends Plugin {
             .addText((t) =>
               t.setValue(this.plugin.settings.folder).onChange(async (v) => {
                 this.plugin.settings.folder = v;
+                await this.plugin.saveData(this.plugin.settings);
+              }),
+            );
+          new Setting(this.containerEl)
+            .setName("Add a follow-up task when renewing")
+            .setDesc(
+              'When on, "Renew" also adds a "Renewal follow-up" task to the end of the note. Off by default.',
+            )
+            .addToggle((t) =>
+              t.setValue(!!this.plugin.settings.renewalFollowUpTask).onChange(async (v) => {
+                this.plugin.settings.renewalFollowUpTask = v;
                 await this.plugin.saveData(this.plugin.settings);
               }),
             );
@@ -2551,16 +2590,32 @@ module.exports = class OperationsManager extends Plugin {
         }
       })(this.app, this),
     );
-    this.renewalSyncPending = new Set();
-    this.registerEvent(
-      this.app.metadataCache.on("changed", (file) => {
-        this.populateNextRenewal(file);
-        this.refresh();
-      }),
-    );
-    this.app.workspace.onLayoutReady(() => {
-      for (const file of this.app.vault.getMarkdownFiles()) this.populateNextRenewal(file);
-    });
+    // Renewal dates estimated from Ordered + Renewal are worked out when displayed; they are never
+    // written back to the note.
+    const refreshSoon = require("obsidian").debounce(() => this.refresh(), 300, true);
+    this.registerEvent(this.app.metadataCache.on("changed", () => refreshSoon()));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.renameSettingsKeys(oldPath, file.path)));
+  }
+  // Per-note settings (alert switches and rules, history, open sections) are keyed by file path,
+  // so follow the note when it is renamed or moved.
+  async renameSettingsKeys(oldPath, newPath) {
+    let changed = false;
+    for (const name of ["licenseAlertRules", "licenseAlerts", "licenseHistory"]) {
+      const map = this.settings[name];
+      if (map && Object.prototype.hasOwnProperty.call(map, oldPath)) {
+        map[newPath] = map[oldPath];
+        delete map[oldPath];
+        changed = true;
+      }
+    }
+    const sections = this.settings.collapsedSections || {};
+    for (const key of Object.keys(sections))
+      if (key.endsWith(":" + oldPath)) {
+        sections[key.slice(0, -oldPath.length) + newPath] = sections[key];
+        delete sections[key];
+        changed = true;
+      }
+    if (changed) await this.saveData(this.settings);
   }
   cardIcon(kind) {
     const value = this.settings.cardIcons?.[kind] ?? OM_CARD_ICONS[kind] ?? "circle";
@@ -2571,42 +2626,6 @@ module.exports = class OperationsManager extends Plugin {
     const holder = parent.createSpan({ cls: "ops-item-icon" });
     if (name !== "none") require("obsidian").setIcon(holder, name);
     return holder;
-  }
-  async populateNextRenewal(file) {
-    if (
-      !file ||
-      file.extension !== "md" ||
-      this.renewalSyncPending.has(file.path) ||
-      file.path
-        .split("/")
-        .slice(0, -1)
-        .some((p) => p.toLowerCase() === "templates")
-    )
-      return;
-    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-    if (
-      !fm ||
-      omTerminated(fm) ||
-      classified(file, fm) !== "renewal" ||
-      omMonthToMonth(fm, file) ||
-      (fm.Next_Renewal != null && String(fm.Next_Renewal).trim() !== "")
-    )
-      return;
-    const next = inferredRenewal(fm);
-    if (!next || !next.estimated) return;
-    this.renewalSyncPending.add(file.path);
-    try {
-      await this.app.fileManager.processFrontMatter(file, (front) => {
-        if (front.Next_Renewal == null || String(front.Next_Renewal).trim() === "") {
-          const computed = inferredRenewal(front);
-          if (computed?.estimated) front.Next_Renewal = computed.date;
-        }
-      });
-    } catch (e) {
-      console.warn("Operations Manager: could not populate Next_Renewal for " + file.path, e);
-    } finally {
-      this.renewalSyncPending.delete(file.path);
-    }
   }
   records() {
     const result = [];
@@ -2653,20 +2672,20 @@ module.exports = class OperationsManager extends Plugin {
           const days = daysUntil(renewal.date);
           const qualifier = renewal.estimated ? "Estimated renewal" : "Renewal";
           reason = qualifier + " " + renewal.date;
-          if (omRenewalAlertsEnabled(fm) && omAlertColor(this, file, "renewal", days)) {
+          if (omRenewalAlertsEnabled(fm, file) && omAlertColor(this, file, "renewal", days)) {
             attention = true;
             reason += days < 0 ? " (past due by " + -days + " days)" : " (in " + days + " days)";
           }
         } else {
           reason = "Renewal date needs review: enter Next_Renewal or Ordered and Renewal (days)";
-          attention = omRenewalAlertsEnabled(fm);
+          attention = omRenewalAlertsEnabled(fm, file);
         }
-        const billing = omBillingAlertsEnabled(fm) ? omBillingInfo(fm) : null;
+        const billing = omBillingAlertsEnabled(fm, file) ? omBillingInfo(fm) : null;
         if (billing && omAlertColor(this, file, "billing", billing.days)) {
           attention = true;
           if (
             !renewal ||
-            !omRenewalAlertsEnabled(fm) ||
+            !omRenewalAlertsEnabled(fm, file) ||
             !omAlertColor(this, file, "renewal", daysUntil(renewal.date))
           )
             reason =
@@ -2723,6 +2742,28 @@ module.exports = class OperationsManager extends Plugin {
     return result.sort(
       (a, b) => Number(b.attention) - Number(a.attention) || a.file.basename.localeCompare(b.file.basename),
     );
+  }
+  async addHistory(file, kind, date) {
+    const path = file.path;
+    const entry = { ...(this.settings.licenseHistory?.[path] || {}) };
+    const list = Array.isArray(entry[kind]) ? [...entry[kind]] : [];
+    if (!list.includes(date)) list.push(date);
+    entry[kind] = list.sort();
+    this.settings.licenseHistory = { ...(this.settings.licenseHistory || {}), [path]: entry };
+    await this.saveData(this.settings);
+  }
+  // Most recent recorded date, from the plugin history or from history older versions wrote to the note.
+  lastHistory(license, kind) {
+    const field = kind === "billing" ? "Billing_History" : "Renewal_History";
+    const legacy = license.fm[field];
+    const dates = [
+      ...(this.settings.licenseHistory?.[license.file.path]?.[kind] || []),
+      ...(Array.isArray(legacy) ? legacy : legacy ? [legacy] : []),
+    ]
+      .map(iso)
+      .filter(Boolean)
+      .sort();
+    return dates[dates.length - 1] ?? null;
   }
   licenseField(license) {
     return String(license.fm.License_Field ?? license.fm.License_Name ?? license.file.basename).trim();
@@ -2834,26 +2875,29 @@ module.exports = class OperationsManager extends Plugin {
           cls: "setting-item-description",
           text: "Choose what deserves attention. Renewal colors keep the existing 90-day warning system.",
         });
-        for (const [field, label, description, enabled] of [
+        for (const [kind, field, label, description, enabled] of [
           [
+            "renewal",
             "Renewal_Alerts",
             "Contract renewals",
             "Notify when this contract approaches renewal.",
-            omRenewalAlertsEnabled(license.fm),
+            omRenewalAlertsEnabled(license.fm, license.file),
           ],
           [
+            "billing",
             "Billing_Alerts",
             "Upcoming charges",
             "Notify before a scheduled billing charge.",
-            omBillingAlertsEnabled(license.fm),
+            omBillingAlertsEnabled(license.fm, license.file),
           ],
           ...(seatBased
             ? [
                 [
+                  "seats",
                   "Seat_Alerts",
                   "Low seat availability",
                   "Notify when 5 or fewer purchased seats remain.",
-                  omSeatAlertsEnabled(license.fm),
+                  omSeatAlertsEnabled(license.fm, license.file),
                 ],
               ]
             : []),
@@ -2864,10 +2908,17 @@ module.exports = class OperationsManager extends Plugin {
             .addToggle((t) =>
               t.setValue(enabled).onChange(async (value) => {
                 try {
-                  await this.app.fileManager.processFrontMatter(license.file, (fm) => {
-                    fm[field] = value;
-                  });
-                  license.fm[field] = value;
+                  const path = license.file.path;
+                  this.settings.licenseAlerts = {
+                    ...(this.settings.licenseAlerts || {}),
+                    [path]: { ...(this.settings.licenseAlerts?.[path] || {}), [kind]: value },
+                  };
+                  await this.saveData(this.settings);
+                  // Tidy up the property older versions wrote to the note.
+                  if (Object.prototype.hasOwnProperty.call(license.fm, field))
+                    await this.app.fileManager.processFrontMatter(license.file, (fm) => {
+                      delete fm[field];
+                    });
                   this.refresh();
                   new Notice(label + (value ? " enabled" : " disabled"));
                 } catch (error) {
@@ -2893,6 +2944,18 @@ module.exports = class OperationsManager extends Plugin {
             " · Renewal: " +
             (renewal?.date ?? "Not set"),
         });
+        const lastCharge = this.lastHistory(license, "billing"),
+          lastRenewal = this.lastHistory(license, "renewal");
+        if (lastCharge || lastRenewal)
+          billing.createEl("p", {
+            cls: "ops-settings-facts",
+            text: [
+              lastCharge ? "Last charge recorded: " + lastCharge : "",
+              lastRenewal ? "Last renewed: " + lastRenewal : "",
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          });
         if (charge !== null)
           billing.createEl("p", {
             cls: "ops-settings-facts",
@@ -2990,7 +3053,7 @@ module.exports = class OperationsManager extends Plugin {
       const purchased = multi ? breakdown.rows.reduce((n, x) => n + x.purchased, 0) : inv.total;
       const assigned = multi ? breakdown.rows.reduce((n, x) => n + x.assigned, 0) : inv.assigned;
       const available = purchased === null ? null : purchased - assigned;
-      const alerts = omSeatAlertsEnabled(r.fm);
+      const alerts = omSeatAlertsEnabled(r.fm, r.file);
       const severity =
         alerts && available !== null
           ? available <= 2
@@ -3211,9 +3274,9 @@ module.exports = class OperationsManager extends Plugin {
           summary.createSpan({
             text:
               " · " +
-              (populated(r.fm.Ordered) ? "Ordered" : "Not ordered") +
+              (populated(r.fm.Ordered ?? r.fm.Order_Date) ? "Ordered" : "Not ordered") +
               " · " +
-              (populated(r.fm.Set_Up) ? "Set up" : "Not set up"),
+              (populated(r.fm.Set_Up ?? r.fm.Set_up) ? "Set up" : "Not set up"),
           });
           const note = r.fm.Notes;
           if (populated(note)) {
