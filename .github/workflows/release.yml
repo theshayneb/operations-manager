@@ -1,9 +1,17 @@
-name: Publish Obsidian BRAT Release
+name: Release Plugin
+# Publishes a GitHub prerelease with main.js, manifest.json and styles.css for BRAT.
+# Run it from the Actions tab on main with the version number (e.g. 0.4.87), or push a tag
+# with that version. manifest.json must already carry the version, and CHANGELOG.md must have a
+# "## [x.y.z] - YYYY-MM-DD" entry for it; that entry becomes the release notes.
 on:
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 0.4.87 (no "v")'
+        required: true
 permissions:
   contents: write
 jobs:
@@ -11,16 +19,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify BRAT assets
+      - name: Check version, files and release notes
         shell: bash
+        env:
+          VERSION: ${{ inputs.version || github.ref_name }}
         run: |
-          test -s main.js
-          test -s manifest.json
-          test -s styles.css
-          node -e 'const m=require("./manifest.json"); if(!m.id || !m.version) process.exit(1)'
-      - name: Publish GitHub prerelease
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 1.2.3"; exit 1; }
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Run this workflow on main"; exit 1
+          fi
+          test -s main.js && test -s manifest.json && test -s styles.css
+          node --check main.js
+          node -e 'const m=require("./manifest.json"); if(m.id!=="operations-manager"||m.version!==process.env.VERSION){console.error("manifest.json id/version mismatch: "+m.id+" "+m.version);process.exit(1)}'
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" {found=1; next}
+            found && /^## \[/ {exit}
+            found {print}
+          ' CHANGELOG.md > notes.md
+          grep -q '[^[:space:]]' notes.md || { echo "No CHANGELOG.md entry for $VERSION"; exit 1; }
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" main.js manifest.json styles.css --title "Operations Manager $TAG (Beta)" --notes "Experimental Obsidian plugin. Back up your vault before installing. Install via BRAT using theshayneb/operations-manager." --prerelease
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "Release $VERSION already exists; pick a new version"; exit 1
+          fi
+          gh release create "$VERSION" main.js manifest.json styles.css \
+            --target "$GITHUB_SHA" \
+            --title "Operations Manager $VERSION" \
+            --notes-file notes.md \
+            --prerelease
