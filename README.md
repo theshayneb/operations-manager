@@ -9,4 +9,22 @@ A beta Obsidian plugin for tracking equipment, licenses, renewals, and invoices 
 3. Enter `theshayneb/operations-manager`.
 4. Enable **Operations Manager** in Community plugins.
 
+## Note types
+
+Give each note a `type` property so the plugin knows what it is:
+
+| type | For | Shows on |
+|---|---|---|
+| `computer` | A laptop or desktop assigned to an employee. Add the `equip_ug` tag for replacements in that project. | Equipment |
+| `peripheral` | Mouse, keyboard, monitor, dock… | Equipment |
+| `equipment` | Printers, postage machines | Equipment |
+| `service` | Off-site storage, shredding, IT company | Licenses & Renewals |
+| `contract` | A lease or yearly agreement with a renewal date | Licenses & Renewals |
+| `license` | Per-seat software, or a bundle of license types making up one bill | Licenses & Renewals |
+| `invoice` | A bill | Invoices |
+| `order` | A purchase | Orders |
+| `employee` | A person, with one checkbox per license they hold | – |
+
+The **New note** button (or the "Create a new operations note" command) creates a note with the right properties for each type. **Settings → Note types & properties** lists them all. Notes that use tags instead of `type` keep working.
+
 **Status:** Experimental. Back up your vault before use. BRAT installation requires a published GitHub release with `main.js`, `manifest.json`, and `styles.css` attached.

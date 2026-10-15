@@ -180,7 +180,231 @@ function daysUntil(d) {
     (Date.parse(d + "T00:00:00Z") - Date.parse(dateISO(new Date()) + "T00:00:00Z")) / 86400000,
   );
 }
+// Note types. A note's `type` property says what it is; tags keep working for notes without one.
+// Each property: [name, kind, what to enter, default value for new notes]. Kinds: text, link, date,
+// number, checkbox, list. Properties marked optional are listed in the guide but not added to new notes.
+const OM_TYPE_ALIASES = {
+  computer: ["computer", "laptop", "desktop", "workstation", "pc", "device"],
+  peripheral: ["peripheral", "monitor", "keyboard", "mouse", "dock", "headset", "accessory"],
+  equipment: ["equipment", "office equipment", "printer", "copier", "postage machine", "machine"],
+  service: ["service", "vendor"],
+  contract: ["contract", "agreement", "lease"],
+  license: ["license", "licence", "subscription", "software", "license bundle"],
+  invoice: ["invoice", "bill"],
+  order: ["order", "purchase", "purchase order"],
+  employee: ["employee", "person", "staff"],
+};
+const OM_TYPE_LABELS = {
+  computer: "Computer",
+  peripheral: "Peripheral",
+  equipment: "Office equipment",
+  service: "Service",
+  contract: "Contract",
+  license: "License",
+  invoice: "Bill",
+  order: "Order",
+  employee: "Employee",
+};
+const OM_STATUS = "Status";
+const OM_TEMPLATES = [
+  {
+    id: "computer",
+    type: "computer",
+    label: "Computer",
+    description: "A laptop or desktop assigned to one employee. Shows on the Equipment tab.",
+    props: [
+      [OM_STATUS, "text", "deployed, spare, retired, to do, ordered, delivered…", "deployed"],
+      ["Employee", "link", "Who has it, as a link: [[Jane Doe]]."],
+      ["Model", "text", "Make and model."],
+      ["Serial", "text", "Serial number."],
+      ["Set_Up", "date", "Date it was set up for the employee."],
+      ["Notes", "text", "Anything else. [[Links]] are clickable on the cards."],
+      ["Ordered", "date", "Date it was ordered.", undefined, true],
+    ],
+  },
+  {
+    id: "replacement",
+    type: "computer",
+    tags: ["equip_ug"],
+    label: "Replacement computer (equip_ug)",
+    description:
+      'A new computer replacing an old one as part of the equip_ug project. The equip_ug tag groups these by phase on the Dashboard ("Equipment by Phase").',
+    props: [
+      [OM_STATUS, "text", "to do, ordered, delivered, complete…", "to do"],
+      ["Approved", "text", "Who approved it and the phase, e.g. Approved by Sam · Phase 2. The \"Phase …\" part is the group."],
+      ["Employee", "link", "Who it is for, as a link: [[Jane Doe]]."],
+      ["To_Replace", "link", "The old computer's note, as a link."],
+      ["Model", "text", "Make and model."],
+      ["Serial", "text", "Serial number."],
+      ["Ordered", "date", "Date it was ordered."],
+      ["Set_Up", "date", "Date it was set up for the employee."],
+      ["Old_Device_Returned", "checkbox", "Ticked once the old computer is back.", false],
+      ["Notes", "text", "Anything else."],
+    ],
+  },
+  {
+    id: "peripheral",
+    type: "peripheral",
+    label: "Peripheral",
+    description: "A mouse, keyboard, monitor, dock or headset assigned to an employee. Shows on the Equipment tab.",
+    props: [
+      [OM_STATUS, "text", "deployed, spare, retired…", "deployed"],
+      ["Employee", "link", "Who has it, as a link: [[Jane Doe]]."],
+      ["Model", "text", "Make and model."],
+      ["Serial", "text", "Serial number, if it has one."],
+      ["Notes", "text", "e.g. Used with [[Laptop – Jane]]."],
+    ],
+  },
+  {
+    id: "equipment",
+    type: "equipment",
+    label: "Office equipment",
+    description:
+      "A shared machine such as a printer or postage machine. Its lease or service agreement goes in a separate Contract note.",
+    props: [
+      [OM_STATUS, "text", "deployed, spare, retired…", "deployed"],
+      ["Vendor", "text", "Who supplies or services it."],
+      ["Model", "text", "Make and model."],
+      ["Serial", "text", "Serial number."],
+      ["Notes", "text", "Location, and a link to its contract: [[Printer lease]]."],
+    ],
+  },
+  {
+    id: "service",
+    type: "service",
+    label: "Service",
+    description:
+      "An ongoing vendor service such as off-site storage, shredding or your IT company. Shows on the Licenses & Renewals tab and warns before each charge. Its yearly agreement goes in a separate Contract note.",
+    props: [
+      [OM_STATUS, "text", "active, cancelled…", "active"],
+      ["Vendor", "text", "Company name."],
+      ["Cost", "number", "Amount charged each billing cycle."],
+      ["Billing", "text", "Monthly, Quarterly, Semiannually or Annually.", "Monthly"],
+      ["Next_Billing", "date", "Date of the next charge."],
+      ["Notes", "text", "Contacts, account number, and a link to its contract: [[IT contract 2026]]."],
+    ],
+  },
+  {
+    id: "contract",
+    type: "contract",
+    label: "Contract",
+    description:
+      "An agreement with a renewal date: a printer lease, or the yearly contract for a service. Shows on the Licenses & Renewals tab and warns before it renews.",
+    props: [
+      [OM_STATUS, "text", "active, cancelled…", "active"],
+      ["Vendor", "text", "Company name."],
+      ["Next_Renewal", "date", "When it next renews or expires."],
+      ["Renewal_Term_Months", "number", "Length of each term, used by the Renew button.", 12],
+      ["Cost", "number", "Amount per billing cycle (or per term)."],
+      ["Notes", "text", "What it covers, as links: [[Office printer]] or [[Iron Mountain]]."],
+      ["Billing", "text", "Only if the contract itself is billed, e.g. a lease: Monthly, Quarterly…", undefined, true],
+      ["Next_Billing", "date", "Only if the contract itself is billed: date of the next charge.", undefined, true],
+    ],
+  },
+  {
+    id: "license",
+    type: "license",
+    label: "Per-seat license",
+    description:
+      "Software with seats assigned to individual employees, such as ChatGPT. Each employee who has a seat gets a ticked checkbox property named after License_Field.",
+    props: [
+      [OM_STATUS, "text", "active, cancelled…", "active"],
+      ["Vendor", "text", "Company name."],
+      ["Agreement_Types", "list", "Keep software seats so seats are counted.", ["software seats"]],
+      ["License_Seats", "number", "Number of seats purchased."],
+      ["License_Field", "text", "Name of the checkbox property on employee notes. Defaults to the note's name."],
+      ["Cost", "number", "Amount charged each billing cycle."],
+      ["Billing", "text", "Monthly, Quarterly, Semiannually or Annually.", "Monthly"],
+      ["Next_Billing", "date", "Date of the next charge."],
+      ["Next_Renewal", "date", "When the subscription renews, if it has a term."],
+    ],
+  },
+  {
+    id: "bundle",
+    type: "license",
+    label: "License bundle (e.g. phone service)",
+    description:
+      'One vendor bill made up of several license types assigned to employees, like your phone service. After creating it, use "Manage license types" on the Licenses & Renewals tab to add each type, its monthly price, seat count and employee checkbox property. The yearly agreement goes in a separate Contract note.',
+    props: [
+      [OM_STATUS, "text", "active, cancelled…", "active"],
+      ["Vendor", "text", "Company name."],
+      ["Cost", "number", "Total amount charged each billing cycle."],
+      ["Billing", "text", "Monthly, Quarterly, Semiannually or Annually.", "Monthly"],
+      ["Next_Billing", "date", "Date of the next charge."],
+      ["License_Types", "list", "Filled in by \"Manage license types\".", []],
+    ],
+  },
+  {
+    id: "invoice",
+    type: "invoice",
+    label: "Bill / invoice",
+    description:
+      "A single bill: for a service, an office machine or licenses. Shows on the Invoices tab until it is marked paid.",
+    props: [
+      [OM_STATUS, "text", "unpaid or paid.", "unpaid"],
+      ["Vendor", "text", "Company name."],
+      ["Date", "date", "Invoice date."],
+      ["Due_Date", "date", "Payment due date."],
+      ["Cost", "number", "Amount."],
+      ["Notes", "text", "What it is for, as links: [[Iron Mountain]]. Shown as \"Services\"."],
+      ["Paid_Date", "date", "Set by Mark paid.", undefined, true],
+    ],
+  },
+  {
+    id: "order",
+    type: "order",
+    label: "Order",
+    description: "A purchase that is not part of the equip_ug project. Shows on the Orders tab until complete.",
+    props: [
+      [OM_STATUS, "text", "to do, ordered, delivered, complete…", "to do"],
+      ["Vendor", "text", "Who it was ordered from."],
+      ["Approved", "text", "Who approved it and when."],
+      ["Ordered", "date", "Date it was ordered."],
+      ["Employee", "link", "Who it is for, as a link: [[Jane Doe]]."],
+      ["Notes", "text", "Anything else."],
+    ],
+  },
+  {
+    id: "employee",
+    type: "employee",
+    label: "Employee",
+    description:
+      "A person. New employee notes get an unticked checkbox for every per-seat license and license-bundle type that uses a checkbox property; tick the ones they have.",
+    props: [
+      ["Termination_Date", "date", "Fill in when they leave: their licenses stop being counted.", undefined, true],
+    ],
+  },
+];
+function omNoteType(fm) {
+  const raw = String(fm?.type ?? fm?.Type ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
+  if (!raw) return null;
+  for (const [type, aliases] of Object.entries(OM_TYPE_ALIASES)) if (aliases.includes(raw)) return type;
+  return null;
+}
+// Services keep their renewal date in a separate contract note, and a typed license that is billed on a
+// schedule may have no term, so only nag about a missing renewal date where one is expected.
+function omNeedsRenewalDate(fm) {
+  const type = omNoteType(fm);
+  if (type === "service") return false;
+  if (type === "license" && omBillingInfo(fm)) return false;
+  return true;
+}
+function omIsEmployee(e) {
+  return (
+    omNoteType(e.fm) === "employee" ||
+    tagSet(e.fm).has("employee") ||
+    e.file.path.split("/").some((p) => /^employees?$/i.test(p))
+  );
+}
 function classified(file, fm) {
+  const type = omNoteType(fm);
+  if (type === "computer" || type === "peripheral" || type === "equipment") return "device";
+  if (type === "service" || type === "contract" || type === "license") return "renewal";
+  if (type === "invoice" || type === "order") return type;
+  if (type === "employee") return null;
   const t = tagSet(fm),
     p = file.path.toLowerCase();
   if (t.has("ops-project") || (t.has("project") && p.includes("project"))) return "project";
@@ -488,6 +712,11 @@ function omNextivaTypes(fm) {
         x.name && Number.isInteger(x.purchased) && x.purchased >= 0 && Number.isFinite(x.rate) && x.rate >= 0,
     );
 }
+// A note whose bill is made up of several license types (License_Types). Notes named after Nextiva
+// count even before any types are added.
+function omIsBundle(r) {
+  return /nextiva/i.test(r.file.basename) || Array.isArray(r.fm.License_Types);
+}
 function omEmployeeLicenseValue(fm, type) {
   if (type.field) {
     const key = Object.keys(fm).find((k) => k.toLowerCase() === type.field.toLowerCase());
@@ -504,8 +733,7 @@ function omNextivaSummary(plugin, license) {
     .employeeNotes()
     .filter(
       (e) =>
-        tagSet(e.fm).has("employee") ||
-        e.file.path.split("/").some((p) => /^employees?$/i.test(p)) ||
+        omIsEmployee(e) ||
         Array.isArray(e.fm.Nextiva_Licenses) ||
         types.some(
           (t) => t.field && Object.keys(e.fm).some((k) => k.toLowerCase() === t.field.toLowerCase()),
@@ -537,7 +765,7 @@ class OMNextivaTypesModal extends Modal {
   render() {
     const c = this.contentEl;
     c.empty();
-    c.createEl("h2", { text: "Nextiva license types" });
+    c.createEl("h2", { text: "License types: " + this.license.file.basename });
     c.createEl("p", {
       text: "Each price is the monthly rate per purchased license. Charges include unused purchased licenses.",
     });
@@ -610,7 +838,7 @@ class OMNextivaTypesModal extends Modal {
               this.close();
               this.plugin.refresh();
               this.plugin.licenseSettingsTab?.display();
-              new Notice("Nextiva license types saved");
+              new Notice("License types saved");
             } catch (e) {
               new Notice("Could not save license types: " + e.message);
             }
@@ -1447,7 +1675,7 @@ class OperationsView extends ItemView {
         cls: "ops-license-summary",
         text: [line, costLine].filter(Boolean).join(" · "),
       });
-    if (!seatBased && !/nextiva/i.test(r.file.basename)) return;
+    if (!seatBased && !omIsBundle(r)) return;
     const key = "licenses:inline:" + r.file.path;
     const details = info.createEl("details", { cls: "ops-license-inline-details" });
     details.open = plugin.settings.collapsedSections?.[key] === true;
@@ -1461,8 +1689,8 @@ class OperationsView extends ItemView {
     });
     details.createEl("summary", { text: "License details" });
     const content = details.createDiv({ cls: "ops-license-inline-body" });
-    if (/nextiva/i.test(r.file.basename) && !multi) {
-      content.createEl("p", { text: "No Nextiva license types configured yet." });
+    if (omIsBundle(r) && !multi) {
+      content.createEl("p", { text: "No license types configured yet." });
       const add = content.createEl("button", { text: "Add license types" });
       add.onclick = () => new OMNextivaTypesModal(this.app, plugin, r).open();
     }
@@ -1572,8 +1800,7 @@ class OperationsView extends ItemView {
         const card = list.createDiv({ cls: "ops-attention-item ops-equipment-card" });
         this.plugin.renderCardIcon(card, "order");
         const info = card.createDiv({ cls: "ops-item-info" });
-        const title = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
-        title.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
+        omCardTitle(info, r, this.app);
         const emp = r.fm.Employee ?? r.fm.Assigned_To;
         if (emp) {
           const line = info.createEl("small");
@@ -1613,9 +1840,7 @@ class OperationsView extends ItemView {
     const actions = nav.createDiv({ cls: "ops-actions" });
     for (const [name, fn] of [
       ["Refresh", () => this.render()],
-      ["New invoice", () => new RecordModal(this.app, this.plugin, "invoice").open()],
-      ["New renewal", () => new RecordModal(this.app, this.plugin, "renewal").open()],
-      ["New order", () => new RecordModal(this.app, this.plugin, "order").open()],
+      ["New note", () => new OMNewNoteModal(this.app, this.plugin).open()],
       ["Export Excel (.xlsx)", () => new OMExportExcelModal(this.app, this.plugin).open()],
     ]) {
       const btn = actions.createEl("button", { text: name });
@@ -1685,10 +1910,7 @@ class OperationsView extends ItemView {
               (this.page === "order"
                 ? r.kind === "order"
                 : this.page === "device"
-                  ? (r.kind === "device" || r.kind === "order") &&
-                    (tagSet(r.fm).has("equip_ug") ||
-                      tagSet(r.fm).has("equip_upgrade") ||
-                      tagSet(r.fm).has("device"))
+                  ? r.kind === "device" || (r.kind === "order" && omIsDeviceNote(r.fm))
                   : r.kind === this.page),
           );
     if (this.page === "invoice") {
@@ -1833,16 +2055,12 @@ class OperationsView extends ItemView {
       const item = list.createDiv({ cls: "ops-attention-item" + (color ? " ops-alert-" + color : "") });
       const icon = this.plugin.renderCardIcon(item, r.kind);
       const info = item.createDiv({ cls: "ops-item-info" });
-      const name = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
-      name.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
+      omCardTitle(info, r, this.app);
       if (
         dashboard &&
         r.kind !== "renewal" &&
         r.kind !== "invoice" &&
-        (r.kind === "device" ||
-          tagSet(r.fm).has("device") ||
-          tagSet(r.fm).has("equip_ug") ||
-          tagSet(r.fm).has("equip_upgrade"))
+        (r.kind === "device" || omIsDeviceNote(r.fm))
       )
         omDashboardDeviceDetails(info, r, this.app, false);
       else if (dashboard && r.kind === "renewal") {
@@ -1856,6 +2074,7 @@ class OperationsView extends ItemView {
         } else if (
           r.attention &&
           omRenewalAlertsEnabled(r.fm, r.file) &&
+          omNeedsRenewalDate(r.fm) &&
           !omMonthToMonth(r.fm, r.file) &&
           !inferredRenewal(r.fm)
         )
@@ -1899,13 +2118,7 @@ class OperationsView extends ItemView {
         const btn = item.createEl("button", { cls: "ops-item-action", text: "Renew" });
         btn.onclick = () => new RenewModal(this.app, this.plugin, r.file, r.fm).open();
       }
-      if (
-        dashboard &&
-        (r.kind === "device" ||
-          tagSet(r.fm).has("device") ||
-          tagSet(r.fm).has("equip_ug") ||
-          tagSet(r.fm).has("equip_upgrade"))
-      ) {
+      if (dashboard && (r.kind === "device" || omIsDeviceNote(r.fm))) {
         const btn = item.createEl("button", { cls: "ops-item-action", text: "Update" });
         btn.onclick = () => new OMDeviceWorkflowModal(this.app, this.plugin, r).open();
       }
@@ -1948,7 +2161,7 @@ class OperationsView extends ItemView {
         const btn = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
         btn.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
         omDashboardDeviceDetails(info, r, this.app, true);
-        if (tagSet(r.fm).has("device") || tagSet(r.fm).has("equip_ug") || tagSet(r.fm).has("equip_upgrade")) {
+        if (omIsDeviceNote(r.fm)) {
           const update = card.createEl("button", { text: "Update", cls: "ops-item-action" });
           update.onclick = () =>
             new OMDeviceWorkflowModal(this.app, this.plugin, { ...r, kind: "device" }).open();
@@ -2068,81 +2281,133 @@ class OMExportExcelModal extends Modal {
     );
   }
 }
-class RecordModal extends Modal {
-  constructor(app, plugin, kind) {
+function omYamlValue(kind, v) {
+  if (kind === "list") {
+    const items = Array.isArray(v) ? v : v == null || v === "" ? [] : [v];
+    return items.length ? items.map((x) => "\n  - " + JSON.stringify(x)).join("") : " []";
+  }
+  if (v === undefined || v === null || v === "") return "";
+  if (kind === "checkbox") return " " + (v === true || v === "true");
+  if (kind === "number" && Number.isFinite(Number(v))) return " " + Number(v);
+  if (kind === "date") return iso(String(v)) ? " " + v : "";
+  const text = String(v);
+  // Plain words stay unquoted; anything YAML could misread (links, numbers, true/false…) is quoted.
+  return /^[A-Za-z][\w .()-]*$/.test(text) && !/^(true|false|yes|no|on|off|null)$/i.test(text)
+    ? " " + text.trim()
+    : " " + JSON.stringify(text);
+}
+// Checkbox properties employee notes use for per-seat licenses and license-bundle types.
+function omEmployeeLicenseFields(plugin) {
+  const fields = new Map();
+  for (const r of plugin.records().filter((x) => x.kind === "renewal")) {
+    const types = omNextivaTypes(r.fm);
+    if (types.length) {
+      for (const t of types) if (t.field) fields.set(t.field.toLowerCase(), t.field);
+    } else if (omTracksSeats(r.fm)) {
+      const field = plugin.licenseField(r);
+      fields.set(field.toLowerCase(), field);
+    }
+  }
+  return [...fields.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+class OMNewNoteModal extends Modal {
+  constructor(app, plugin, templateId = "computer") {
     super(app);
     this.plugin = plugin;
-    this.kind = kind;
-    this.fields = {};
+    this.select(templateId);
+    this.title = "";
+  }
+  select(id) {
+    this.template = OM_TEMPLATES.find((t) => t.id === id) ?? OM_TEMPLATES[0];
+    this.values = {};
+    this.folder = this.plugin.settings.typeFolders?.[this.template.id] ?? this.plugin.settings.folder;
   }
   onOpen() {
+    this.render();
+  }
+  render() {
     const c = this.contentEl;
     c.empty();
-    c.createEl("h2", { text: "New " + this.kind });
-    const specs = {
-      invoice: [
-        ["Vendor", "Vendor"],
-        ["Amount", "Cost"],
-        ["Due date (YYYY-MM-DD)", "Due_Date"],
-        ["Service period start", "Service_Start"],
-        ["Service period end", "Service_End"],
-        ["Services covered / notes", "Notes"],
-      ],
-      renewal: [
-        ["Vendor", "Vendor"],
-        ["Original contract date", "Contract_Date"],
-        ["Next renewal (YYYY-MM-DD)", "Next_Renewal"],
-        ["Term in months", "Renewal_Term_Months"],
-        ["Cost", "Cost"],
-      ],
-      order: [
-        ["Vendor", "Vendor"],
-        ["Approved by / date / phase", "Approved"],
-        ["Ordered date", "Ordered"],
-        ["Assigned employee", "Employee"],
-        ["Replaces (wiki-link)", "To_Replace"],
-      ],
-    };
-    new Setting(c).setName("Note title").addText((t) => t.onChange((v) => (this.title = v)));
-    for (const [label, key] of specs[this.kind])
-      new Setting(c).setName(label).addText((t) => t.onChange((v) => (this.fields[key] = v)));
-    new Setting(c).addButton((b) =>
-      b
-        .setButtonText("Create note")
-        .setCta()
-        .onClick(async () => {
-          if (!this.title?.trim()) {
-            new Notice("Enter a note title");
-            return;
-          }
-          const folder = this.plugin.settings.folder;
-          const path = normalizePath(folder + "/" + this.title.trim().replace(/[\\/:*?"<>|]/g, "-") + ".md");
-          if (this.app.vault.getAbstractFileByPath(path)) {
-            new Notice("A note with that name already exists");
-            return;
-          }
-          try {
-            if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
-            const fm = {
-              tags: [this.kind === "renewal" ? "license" : this.kind],
-              Status: this.kind === "invoice" ? "unpaid" : "to do",
-              ...this.fields,
-            };
-            const yaml = Object.entries(fm)
-              .filter(([, v]) => v !== "" && v != null)
-              .map(
-                ([k, v]) => k + ": " + (Array.isArray(v) ? "\n  - " + v.join("\n  - ") : JSON.stringify(v)),
-              )
-              .join("\n");
-            await this.app.vault.create(path, "---\n" + yaml + "\n---\n");
-            new Notice("Created " + path);
-            this.close();
-            this.plugin.refresh();
-          } catch (e) {
-            new Notice("Could not create note: " + e.message);
-          }
-        }),
-    );
+    c.createEl("h2", { text: "New operations note" });
+    new Setting(c).setName("What are you tracking?").addDropdown((d) => {
+      for (const t of OM_TEMPLATES) d.addOption(t.id, t.label);
+      d.setValue(this.template.id).onChange((v) => {
+        this.select(v);
+        this.render();
+      });
+    });
+    c.createEl("p", { cls: "setting-item-description", text: this.template.description });
+    new Setting(c).setName("Note name").addText((t) => {
+      t.setValue(this.title).onChange((v) => (this.title = v));
+      window.setTimeout(() => t.inputEl.focus(), 0);
+    });
+    new Setting(c)
+      .setName("Folder")
+      .addText((t) => t.setValue(this.folder).onChange((v) => (this.folder = v.trim())));
+    for (const [name, kind, help, , optional] of this.template.props) {
+      if (optional || kind === "list") continue;
+      const line = new Setting(c).setName(name).setDesc(help);
+      if (kind === "checkbox") line.addToggle((t) => t.setValue(false).onChange((v) => (this.values[name] = v)));
+      else
+        line.addText((t) => {
+          if (kind === "date") t.inputEl.type = "date";
+          if (kind === "number") t.inputEl.type = "number";
+          t.onChange((v) => (this.values[name] = v.trim()));
+        });
+    }
+    c.createEl("p", {
+      cls: "setting-item-description",
+      text: "Leave anything you don't know yet blank: the property is still added so you can fill it in later.",
+    });
+    new Setting(c).addButton((b) => b.setButtonText("Create note").setCta().onClick(() => this.create()));
+  }
+  async create() {
+    const title = this.title.trim();
+    if (!title) {
+      new Notice("Enter a note name");
+      return;
+    }
+    const t = this.template;
+    for (const [name, kind] of t.props)
+      if (kind === "date" && this.values[name] && !iso(this.values[name])) {
+        new Notice(name + " must be a YYYY-MM-DD date");
+        return;
+      }
+    const folder = normalizePath(this.folder || "/");
+    const path = normalizePath((folder === "/" ? "" : folder + "/") + title.replace(/[\\/:*?"<>|#^[\]]/g, "-") + ".md");
+    if (this.app.vault.getAbstractFileByPath(path)) {
+      new Notice("A note with that name already exists");
+      return;
+    }
+    const lines = ["type: " + t.type];
+    if (t.tags) lines.push("tags:" + omYamlValue("list", t.tags));
+    for (const [name, kind, , fallback, optional] of t.props) {
+      if (optional) continue;
+      let value = this.values[name] ?? fallback;
+      if (name === "License_Field" && !value) value = title;
+      lines.push(name + ":" + omYamlValue(kind, value));
+    }
+    if (t.id === "employee")
+      for (const field of omEmployeeLicenseFields(this.plugin)) lines.push(field + ": false");
+    try {
+      if (folder !== "/") {
+        let current = "";
+        for (const part of folder.split("/")) {
+          current = current ? current + "/" + part : part;
+          if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
+        }
+      }
+      const file = await this.app.vault.create(path, "---\n" + lines.join("\n") + "\n---\n");
+      if ((this.plugin.settings.typeFolders?.[t.id] ?? this.plugin.settings.folder) !== this.folder) {
+        this.plugin.settings.typeFolders = { ...(this.plugin.settings.typeFolders || {}), [t.id]: this.folder };
+        await this.plugin.saveData(this.plugin.settings);
+      }
+      this.close();
+      await this.app.workspace.getLeaf(false).openFile(file);
+      this.plugin.refresh();
+    } catch (e) {
+      new Notice("Could not create note: " + e.message);
+    }
   }
   onClose() {
     this.contentEl.empty();
@@ -2378,6 +2643,24 @@ class PaidModal extends Modal {
     );
   }
 }
+// Card title, with a small label for note types that share a tab with other types.
+function omCardTitle(info, r, app) {
+  const row = info.createDiv({ cls: "ops-item-head" });
+  const title = row.createEl("button", { cls: "ops-item-title", text: r.file.basename });
+  title.onclick = () => app.workspace.getLeaf(false).openFile(r.file);
+  const type = omNoteType(r.fm);
+  if (["peripheral", "equipment", "service", "contract", "license"].includes(type))
+    row.createSpan({ cls: "ops-type-chip", text: OM_TYPE_LABELS[type] });
+  return title;
+}
+function omIsDeviceNote(fm) {
+  return (
+    ["computer", "peripheral", "equipment"].includes(omNoteType(fm)) ||
+    tagSet(fm).has("device") ||
+    tagSet(fm).has("equip_ug") ||
+    tagSet(fm).has("equip_upgrade")
+  );
+}
 function omCardLinkedText(parent, value, app, sourcePath) {
   const text = Array.isArray(value) ? value.map(String).join(", ") : String(value ?? "");
   const parts = text.split(/(\[\[[^\]]+\]\])/g);
@@ -2517,6 +2800,11 @@ module.exports = class OperationsManager extends Plugin {
       name: "Open Operations Manager",
       callback: () => this.activate(),
     });
+    this.addCommand({
+      id: "new-note",
+      name: "Create a new operations note",
+      callback: () => new OMNewNoteModal(this.app, this).open(),
+    });
     this.addSettingTab(
       new (class extends require("obsidian").PluginSettingTab {
         display() {
@@ -2526,7 +2814,7 @@ module.exports = class OperationsManager extends Plugin {
           this.containerEl.createEl("h3", { text: "General" });
           new Setting(this.containerEl)
             .setName("Folder for new records")
-            .setDesc("Where new invoices, orders and license notes are created.")
+            .setDesc("Where new notes are created, unless you pick a different folder for a type when creating one.")
             .addText((t) =>
               t.setValue(this.plugin.settings.folder).onChange(async (v) => {
                 this.plugin.settings.folder = v;
@@ -2544,6 +2832,7 @@ module.exports = class OperationsManager extends Plugin {
                 await this.plugin.saveData(this.plugin.settings);
               }),
             );
+          this.plugin.renderTypeGuide(this.containerEl);
           const iconSection = this.containerEl.createEl("details", { cls: "ops-settings-icon-section" });
           iconSection.createEl("summary", { text: "Customize card icons" });
           iconSection.createEl("p", {
@@ -2676,6 +2965,8 @@ module.exports = class OperationsManager extends Plugin {
             attention = true;
             reason += days < 0 ? " (past due by " + -days + " days)" : " (in " + days + " days)";
           }
+        } else if (!omNeedsRenewalDate(fm)) {
+          reason = "";
         } else {
           reason = "Renewal date needs review: enter Next_Renewal or Ordered and Renewal (days)";
           attention = omRenewalAlertsEnabled(fm, file);
@@ -2743,6 +3034,42 @@ module.exports = class OperationsManager extends Plugin {
       (a, b) => Number(b.attention) - Number(a.attention) || a.file.basename.localeCompare(b.file.basename),
     );
   }
+  renderTypeGuide(root) {
+    const section = root.createDiv({ cls: "ops-type-guide" });
+    section.createEl("h3", { text: "Note types & properties" });
+    section.createEl("p", {
+      cls: "setting-item-description",
+      text: "Give each note a type property so the plugin knows what it is, then fill in the properties listed for that type. Notes that use tags (device, equip_ug, license, invoice, order) instead of type keep working.",
+    });
+    for (const t of OM_TEMPLATES) {
+      const details = section.createEl("details", { cls: "ops-settings-license" });
+      details.createEl("summary", { cls: "ops-settings-license-summary", text: t.label });
+      const body = details.createDiv({ cls: "ops-settings-license-body" });
+      body.createEl("p", { cls: "setting-item-description", text: t.description });
+      body.createEl("p", {
+        cls: "ops-settings-facts",
+        text: "type: " + t.type + (t.tags ? " · tags: " + t.tags.join(", ") : ""),
+      });
+      const table = body.createEl("table", { cls: "ops-type-guide-table" });
+      const head = table.createEl("tr");
+      for (const label of ["Property", "Kind", "What to enter"]) head.createEl("th", { text: label });
+      for (const [name, kind, help, , optional] of t.props) {
+        const tr = table.createEl("tr");
+        tr.createEl("td", { text: name });
+        tr.createEl("td", { text: kind });
+        tr.createEl("td", { text: (optional ? "Optional. " : "") + help });
+      }
+      if (t.id === "employee") {
+        const fields = omEmployeeLicenseFields(this);
+        const tr = table.createEl("tr");
+        tr.createEl("td", { text: fields.length ? fields.join(", ") : "One per license" });
+        tr.createEl("td", { text: "checkbox" });
+        tr.createEl("td", { text: "Ticked when this person has that license seat." });
+      }
+      const create = body.createEl("button", { text: "Create a note of this type" });
+      create.onclick = () => new OMNewNoteModal(this.app, this, t.id).open();
+    }
+  }
   async addHistory(file, kind, date) {
     const path = file.path;
     const entry = { ...(this.settings.licenseHistory?.[path] || {}) };
@@ -2792,9 +3119,7 @@ module.exports = class OperationsManager extends Plugin {
     const field = this.licenseField(license);
     const employees = this.employeeNotes().filter(
       (e) =>
-        Object.keys(e.fm).some((k) => k.toLowerCase() === field.toLowerCase()) ||
-        tagSet(e.fm).has("employee") ||
-        e.file.path.split("/").some((p) => /^employees?$/i.test(p)),
+        Object.keys(e.fm).some((k) => k.toLowerCase() === field.toLowerCase()) || omIsEmployee(e),
     );
     employees.sort((a, b) =>
       a.file.basename.localeCompare(b.file.basename, undefined, { sensitivity: "base", numeric: true }),
@@ -2967,10 +3292,10 @@ module.exports = class OperationsManager extends Plugin {
           text: renewal ? "Edit renewal date" : "Set contract renewal date",
         });
         contractDate.onclick = () => new OMContractDateModal(this.app, this, license).open();
-        if (seatBased || /nextiva/i.test(license.file.basename)) {
+        if (seatBased || omIsBundle(license)) {
           const seats = body.createDiv({ cls: "ops-settings-group" });
           seats.createEl("h4", { text: "Seats & assignments" });
-          if (hasTypes || /nextiva/i.test(license.file.basename)) {
+          if (hasTypes || omIsBundle(license)) {
             if (hasTypes) {
               seats.createEl("p", {
                 cls: "ops-settings-facts",
@@ -2994,7 +3319,7 @@ module.exports = class OperationsManager extends Plugin {
             } else
               seats.createEl("p", {
                 cls: "ops-settings-facts",
-                text: "No license types configured yet. Add each Nextiva license type, its monthly price, and purchased seat count.",
+                text: "No license types configured yet. Add each license type, its monthly price, and purchased seat count.",
               });
             const typeBtn = seats.createEl("button", {
               text: hasTypes ? "Manage license types" : "Add license types",
@@ -3248,8 +3573,7 @@ module.exports = class OperationsManager extends Plugin {
           const card = list.createDiv({ cls: "ops-attention-item ops-equipment-card" });
           this.renderCardIcon(card, "device");
           const info = card.createDiv({ cls: "ops-item-info" });
-          const title = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
-          title.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
+          omCardTitle(info, r, this.app);
           const addLinkedText = (parent, value) => {
             const parts = showValue(value).split(/(\[\[[^\]]+\]\])/g);
             for (const part of parts) {

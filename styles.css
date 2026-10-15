@@ -88,3 +88,11 @@
 .ops-command .ops-item-info .ops-active-alert-orange{color:#ffae52!important}
 .ops-command .ops-item-info .ops-active-alert-yellow{color:#ffeb66!important}
 .ops-command .ops-item-info .ops-active-alert-green{color:#3caf73!important}
+
+/* Card title row with an optional note-type label. */
+.ops-item-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;min-width:0}
+.ops-type-chip{font-size:11px;line-height:1.5;padding:0 7px;border:1px solid var(--background-modifier-border);border-radius:999px;color:var(--text-muted);white-space:nowrap}
+.ops-type-guide{margin:18px 0}
+.ops-type-guide-table{width:100%;font-size:12px;border-collapse:collapse;margin:6px 0 10px}
+.ops-type-guide-table th,.ops-type-guide-table td{text-align:left;vertical-align:top;padding:4px 8px;border-bottom:1px solid var(--background-modifier-border)}
+.ops-type-guide-table td:first-child{font-family:var(--font-monospace);white-space:nowrap}
