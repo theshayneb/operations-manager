@@ -1,344 +1,3422 @@
-
-function xlsxWorkbook(columns,records){
- const xmlEscape=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
- const colName=n=>{let a='';for(let x=n+1;x;x=Math.floor((x-1)/26))a=String.fromCharCode(65+(x-1)%26)+a;return a};
- const data=[columns,...records];
- const rows=data.map((values,i)=>'<row r="'+(i+1)+'">'+values.map((v,j)=>{const ref=colName(j)+(i+1),style=i===0?' s="1"':'';const numeric=i>0&&columns[j]==='Cost'&&v!==''&&v!=null&&Number.isFinite(Number(v));return numeric?'<c r="'+ref+'" s="2"><v>'+Number(v)+'</v></c>':'<c r="'+ref+'" t="inlineStr"'+style+'><is><t>'+xmlEscape(v)+'</t></is></c>'}).join('')+'</row>').join('');
- const widths=columns.map((c,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+Math.min(48,Math.max(13,c.length+3))+'" customWidth="1"/>').join('');
- const sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:'+colName(columns.length-1)+data.length+'"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>'+widths+'</cols><sheetData>'+rows+'</sheetData><autoFilter ref="A1:'+colName(columns.length-1)+data.length+'"/></worksheet>';
- const files={
- '[Content_Types].xml':'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
- '_rels/.rels':'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
- 'xl/workbook.xml':'<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Operations Records" sheetId="1" r:id="rId1"/></sheets></workbook>',
- 'xl/_rels/workbook.xml.rels':'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
- 'xl/styles.xml':'<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF244466"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="1" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>',
- 'xl/worksheets/sheet1.xml':sheet};
- const crcTable=Array.from({length:256},(_,n)=>{let c=n;for(let k=0;k<8;k++)c=c&1?0xedb88320^(c>>>1):c>>>1;return c>>>0});
- const crc=buf=>{let c=0xffffffff;for(const b of buf)c=crcTable[(c^b)&255]^(c>>>8);return(c^0xffffffff)>>>0};
- const local=[],central=[];let offset=0;const u16=(b,n,p)=>b.writeUInt16LE(n,p),u32=(b,n,p)=>b.writeUInt32LE(n>>>0,p);
- for(const [name,content] of Object.entries(files)){const nameBuf=Buffer.from(name),body=Buffer.from(content),sum=crc(body);const lh=Buffer.alloc(30);u32(lh,0x04034b50,0);u16(lh,20,4);u16(lh,0,6);u16(lh,0,8);u32(lh,sum,14);u32(lh,body.length,18);u32(lh,body.length,22);u16(lh,nameBuf.length,26);local.push(lh,nameBuf,body);const ch=Buffer.alloc(46);u32(ch,0x02014b50,0);u16(ch,20,4);u16(ch,20,6);u32(ch,sum,16);u32(ch,body.length,20);u32(ch,body.length,24);u16(ch,nameBuf.length,28);u32(ch,offset,42);central.push(ch,nameBuf);offset+=lh.length+nameBuf.length+body.length}
- const centralSize=central.reduce((n,b)=>n+b.length,0);const end=Buffer.alloc(22);u32(end,0x06054b50,0);u16(end,Object.keys(files).length,8);u16(end,Object.keys(files).length,10);u32(end,centralSize,12);u32(end,offset,16);return Buffer.concat([...local,...central,end])
+function xlsxWorkbook(columns, records) {
+  const xmlEscape = (v) =>
+    String(v ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  const colName = (n) => {
+    let a = "";
+    for (let x = n + 1; x; x = Math.floor((x - 1) / 26)) a = String.fromCharCode(65 + ((x - 1) % 26)) + a;
+    return a;
+  };
+  const data = [columns, ...records];
+  const rows = data
+    .map(
+      (values, i) =>
+        '<row r="' +
+        (i + 1) +
+        '">' +
+        values
+          .map((v, j) => {
+            const ref = colName(j) + (i + 1),
+              style = i === 0 ? ' s="1"' : "";
+            const numeric =
+              i > 0 && columns[j] === "Cost" && v !== "" && v != null && Number.isFinite(Number(v));
+            return numeric
+              ? '<c r="' + ref + '" s="2"><v>' + Number(v) + "</v></c>"
+              : '<c r="' + ref + '" t="inlineStr"' + style + "><is><t>" + xmlEscape(v) + "</t></is></c>";
+          })
+          .join("") +
+        "</row>",
+    )
+    .join("");
+  const widths = columns
+    .map(
+      (c, i) =>
+        '<col min="' +
+        (i + 1) +
+        '" max="' +
+        (i + 1) +
+        '" width="' +
+        Math.min(48, Math.max(13, c.length + 3)) +
+        '" customWidth="1"/>',
+    )
+    .join("");
+  const sheet =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:' +
+    colName(columns.length - 1) +
+    data.length +
+    '"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+    widths +
+    "</cols><sheetData>" +
+    rows +
+    '</sheetData><autoFilter ref="A1:' +
+    colName(columns.length - 1) +
+    data.length +
+    '"/></worksheet>';
+  const files = {
+    "[Content_Types].xml":
+      '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+    "_rels/.rels":
+      '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    "xl/workbook.xml":
+      '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Operations Records" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    "xl/_rels/workbook.xml.rels":
+      '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+    "xl/styles.xml":
+      '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF244466"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="1" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>',
+    "xl/worksheets/sheet1.xml": sheet,
+  };
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (buf) => {
+    let c = 0xffffffff;
+    for (const b of buf) c = crcTable[(c ^ b) & 255] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const local = [],
+    central = [];
+  let offset = 0;
+  const u16 = (b, n, p) => b.writeUInt16LE(n, p),
+    u32 = (b, n, p) => b.writeUInt32LE(n >>> 0, p);
+  for (const [name, content] of Object.entries(files)) {
+    const nameBuf = Buffer.from(name),
+      body = Buffer.from(content),
+      sum = crc(body);
+    const lh = Buffer.alloc(30);
+    u32(lh, 0x04034b50, 0);
+    u16(lh, 20, 4);
+    u16(lh, 0, 6);
+    u16(lh, 0, 8);
+    u32(lh, sum, 14);
+    u32(lh, body.length, 18);
+    u32(lh, body.length, 22);
+    u16(lh, nameBuf.length, 26);
+    local.push(lh, nameBuf, body);
+    const ch = Buffer.alloc(46);
+    u32(ch, 0x02014b50, 0);
+    u16(ch, 20, 4);
+    u16(ch, 20, 6);
+    u32(ch, sum, 16);
+    u32(ch, body.length, 20);
+    u32(ch, body.length, 24);
+    u16(ch, nameBuf.length, 28);
+    u32(ch, offset, 42);
+    central.push(ch, nameBuf);
+    offset += lh.length + nameBuf.length + body.length;
+  }
+  const centralSize = central.reduce((n, b) => n + b.length, 0);
+  const end = Buffer.alloc(22);
+  u32(end, 0x06054b50, 0);
+  u16(end, Object.keys(files).length, 8);
+  u16(end, Object.keys(files).length, 10);
+  u32(end, centralSize, 12);
+  u32(end, offset, 16);
+  return Buffer.concat([...local, ...central, end]);
 }
-const {Plugin,ItemView,Modal,Setting,Notice,normalizePath}=require('obsidian');
-const VIEW='operations-manager-view';
-const dateISO=d=>d.toISOString().slice(0,10);
-function addMonths(iso,months){const [y,m,d]=iso.split('-').map(Number);if(!y||!m||!d)return null;const target=new Date(Date.UTC(y,m-1+months,1));const last=new Date(Date.UTC(target.getUTCFullYear(),target.getUTCMonth()+1,0)).getUTCDate();target.setUTCDate(Math.min(d,last));return dateISO(target)}
-function tagSet(fm,file,app){const values=[fm.tags].flatMap(v=>Array.isArray(v)?v:typeof v==='string'?v.split(/[,\s]+/):[]);return new Set(values.map(x=>String(x).trim().replace(/^#/,'').toLowerCase()).filter(Boolean))}
-function omTerminated(fm){const value=fm.Termination_Date??fm.termination_date;return value!==undefined&&value!==null&&String(value).trim()!==''&&String(value).trim().toLowerCase()!=='null'}
-function omLicenseAssigned(value){return value===true||String(value??'').trim().toLowerCase()==='checked'}
-function iso(v){if(v instanceof Date)return dateISO(v);if(typeof v==='string')return /^\d{4}-\d{2}-\d{2}$/.test(v)?v:null;return null}
-function omMonthToMonth(fm,file){const fields=[fm.Billing_Cycle,fm.Renewal_Type,fm.Renewal_Term,fm.Contract_Type,fm.Renewal];return fields.some(v=>/^(month[ -]?to[ -]?month|monthly|m2m)$/i.test(String(v??'').trim()))}
-function inferredRenewal(fm){const explicit=iso(fm.Next_Renewal);if(explicit)return {date:explicit,estimated:false};const ordered=iso(fm.Ordered);const term=Number(fm.Renewal);if(!ordered||!Number.isInteger(term)||term<=0||term>36500)return null;const d=new Date(ordered+'T00:00:00Z');if(!Number.isFinite(d.getTime()))return null;d.setUTCDate(d.getUTCDate()+term);return {date:dateISO(d),estimated:true}}
-function daysUntil(d){return Math.round((Date.parse(d+'T00:00:00Z')-Date.parse(dateISO(new Date())+'T00:00:00Z'))/86400000)}
-function classified(file,fm){const t=tagSet(fm),p=file.path.toLowerCase();if(t.has('ops-project')||t.has('project')&&p.includes('project'))return 'project';if(t.has('invoice')||p.includes('/invoices/'))return 'invoice';if(t.has('license')||t.has('licenses')||t.has('subscription')||t.has('renewal')||t.has('software_license')||t.has('printer')&&(fm.Renewal!=null||fm.Next_Renewal!=null||fm.Agreement_Types!=null)||fm.Agreement_Types!=null||fm.License_Seats!=null||fm.License_Field!=null||fm.License_Types!=null||fm.Next_Renewal!=null||fm.Next_Billing!=null&&fm.Billing!=null||fm.License_Type!=null&&/maintenance|lease|agreement|software|subscription/i.test(String(fm.License_Type)))return 'renewal';if(t.has('equip_up')||t.has('equip_upgrade')||t.has('equip_ug'))return 'order';if(t.has('order'))return 'order';if(t.has('device'))return 'device';return null}
-function status(fm){return String(fm.Status??fm.status??'').trim().toLowerCase()}
-function termMonths(fm){const x=Number(fm.Renewal_Term_Months);return Number.isInteger(x)&&x>0?x:null}
-
-function omLinkValue(v){if(v==null)return'';if(Array.isArray(v))return omLinkValue(v[0]);if(typeof v==='object')return String(v.path??v.link??'');return String(v).replace(/^\\[\\[/,'').replace(/\\]\\]$/,'').split('|')[0].trim()}
-function omKey(v){return omLinkValue(v).replace(/\\\\/g,'/').replace(/\\.md$/i,'').toLowerCase()}
-function omMatches(ref,file){const k=omKey(ref);return !!k&&(k===omKey(file.path)||k===omKey(file.basename)||k===omKey(file.path.split('/').slice(-1)[0]))}
-function omRelated(fm,field){const v=fm[field];return Array.isArray(v)?v:v==null?[]:[v]}
-class OMDeviceWorkflowModal extends Modal{
- constructor(app,plugin,record){super(app);this.plugin=plugin;this.record=record;const fm=record.fm;this.status=String(fm.Status??fm.status??'in progress');this.employee=Array.isArray(fm.Employee)?fm.Employee.map(String).join(', '):String(fm.Employee??fm.Assigned_To??'');this.serial=String(fm.Serial_Number??fm.Serial??'');this.model=String(fm.Device_Model??fm.Model??'');this.orderDate=iso(fm.Ordered??fm.Order_Date)??'';this.received=iso(fm.Set_Up??fm.Set_up)??'';this.oldReturned=!!fm.Old_Device_Returned}
- onOpen(){const c=this.contentEl;c.createEl('h2',{text:'Update equipment workflow'});c.createEl('p',{text:this.record.file.basename});const choices=['in progress','awaiting approval','ordered','shipped','delivered','complete','cancelled'];const current=this.status;new Setting(c).setName('Status').setDesc('Uses the existing Status property; no Order_Status field.').addDropdown(d=>{for(const option of [...new Set([...choices,current])])d.addOption(option,option);this.status=this.received&&current==='in progress'?'delivered':this.orderDate&&current==='in progress'?'ordered':current;d.setValue(this.status);d.onChange(v=>this.status=v)});const field=(label,val,set)=>new Setting(c).setName(label).addText(t=>t.setValue(val).onChange(set));field('Employee',this.employee,v=>this.employee=v);field('Device model',this.model,v=>this.model=v);field('Serial number',this.serial,v=>this.serial=v);const dateField=(label,value,save)=>new Setting(c).setName(label).addText(t=>{t.inputEl.type='date';t.setValue(value);t.onChange(save)});dateField('Ordered',this.orderDate,v=>this.orderDate=v);dateField('Set_Up',this.received,v=>this.received=v);new Setting(c).setName('Old device returned').addToggle(t=>t.setValue(this.oldReturned).onChange(v=>this.oldReturned=v));new Setting(c).addButton(b=>b.setButtonText('Save to original note').setCta().onClick(async()=>{for(const v of [this.orderDate,this.received])if(v&&!iso(v)){new Notice('Dates must use YYYY-MM-DD');return}try{await this.app.fileManager.processFrontMatter(this.record.file,fm=>{fm.Status=this.status;delete fm.Order_Status;if(Object.prototype.hasOwnProperty.call(fm,'Employee'))fm.Employee=Array.isArray(fm.Employee)?this.employee.split(',').map(x=>x.trim()).filter(Boolean):this.employee;else fm.Employee=this.employee;fm.Device_Model=this.model;fm.Serial_Number=this.serial;fm.Ordered=this.orderDate;fm.Set_Up=this.received;fm.Old_Device_Returned=this.oldReturned});new Notice('Equipment workflow updated');this.close();this.plugin.refresh()}catch(e){new Notice('Could not save: '+e.message)}}))}
+const { Plugin, ItemView, Modal, Setting, Notice, normalizePath } = require("obsidian");
+const VIEW = "operations-manager-view";
+const dateISO = (d) => d.toISOString().slice(0, 10);
+function addMonths(iso, months) {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const target = new Date(Date.UTC(y, m - 1 + months, 1));
+  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(d, last));
+  return dateISO(target);
 }
-class OMEmployeeLicenseModal extends Modal{
- constructor(app,plugin,license,employees){super(app);this.plugin=plugin;this.license=license;this.employees=employees;this.search=''}
- onOpen(){this.render()}
- render(){const c=this.contentEl;c.empty();const field=this.plugin.licenseField(this.license);c.createEl('h2',{text:'Employee assignments: '+field});new Setting(c).setName('Find employee').addText(t=>t.setValue(this.search).onChange(v=>{this.search=v;this.render()}));const matching=this.employees.filter(e=>e.file.basename.toLowerCase().includes(this.search.toLowerCase())).sort((a,b)=>a.file.basename.localeCompare(b.file.basename,undefined,{sensitivity:'base',numeric:true}));for(const e of matching){const active=omLicenseAssigned(e.fm[field]);new Setting(c).setName(e.file.basename).setDesc(active?'Assigned':'Not assigned').addButton(b=>b.setButtonText(active?'Unassign':'Assign').onClick(async()=>{try{if(!active){const counts=this.plugin.licenseInventory(this.license);if(counts.total!==null&&counts.assigned>=counts.total){new Notice('No available seats. Increase purchased seats or unassign an employee first.');return}}await this.app.fileManager.processFrontMatter(e.file,fm=>{fm[field]=active?false:true});e.fm[field]=active?false:true;this.plugin.refresh();this.render()}catch(err){new Notice('Could not update employee: '+err.message)}}))}if(!matching.length)c.createEl('p',{text:'No matching employee notes.'})}
+function tagSet(fm, file, app) {
+  const values = [fm.tags].flatMap((v) =>
+    Array.isArray(v) ? v : typeof v === "string" ? v.split(/[,\s]+/) : [],
+  );
+  return new Set(values.map((x) => String(x).trim().replace(/^#/, "").toLowerCase()).filter(Boolean));
 }
-class OMAgreementTypesModal extends Modal{
- constructor(app,plugin,record){super(app);this.plugin=plugin;this.record=record;const fm=record.fm;const raw=fm.Agreement_Types??fm.Agreement_Type??fm.License_Type??[];this.types=new Set((Array.isArray(raw)?raw:String(raw).split(',')).map(v=>String(v).trim().toLowerCase()).filter(Boolean))}
- onOpen(){const c=this.contentEl;c.createEl('h2',{text:'Agreement types: '+this.record.file.basename});c.createEl('p',{text:'Choose all that apply.'});for(const name of ['Maintenance','Lease','Software seats','Other']){const key=name.toLowerCase();new Setting(c).setName(name).addToggle(t=>t.setValue(this.types.has(key)||(key==='software seats'&&(this.types.has('seat')||this.types.has('software')||this.types.has('per-user')))).onChange(v=>{if(v)this.types.add(key);else{this.types.delete(key);if(key==='software seats'){this.types.delete('seat');this.types.delete('software');this.types.delete('per-user')}}}))}new Setting(c).addButton(b=>b.setButtonText('Save agreement types').setCta().onClick(async()=>{try{const values=[...this.types];await this.app.fileManager.processFrontMatter(this.record.file,fm=>{fm.Agreement_Types=values});this.record.fm.Agreement_Types=values;this.close();this.plugin.refresh();new Notice('Agreement types saved')}catch(e){new Notice('Could not save: '+e.message)}}))}
+function omTerminated(fm) {
+  const value = fm.Termination_Date ?? fm.termination_date;
+  return (
+    value !== undefined &&
+    value !== null &&
+    String(value).trim() !== "" &&
+    String(value).trim().toLowerCase() !== "null"
+  );
 }
-function omNextivaTypes(fm){const raw=fm.License_Types;return(Array.isArray(raw)?raw:[]).filter(x=>x&&typeof x==='object').map(x=>({name:String(x.Name??x.name??'').trim(),purchased:Number(x.Purchased??x.purchased),rate:Number(x.Monthly_Rate??x.monthly_rate),field:String(x.Employee_Field??x.employee_field??'').trim()})).filter(x=>x.name&&Number.isInteger(x.purchased)&&x.purchased>=0&&Number.isFinite(x.rate)&&x.rate>=0)}
-function omEmployeeLicenseValue(fm,type){if(type.field){const key=Object.keys(fm).find(k=>k.toLowerCase()===type.field.toLowerCase());return key?omLicenseAssigned(fm[key]):false}const raw=fm.Nextiva_Licenses;return(Array.isArray(raw)?raw:typeof raw==='string'?[raw]:[]).some(v=>String(v).trim().toLowerCase()===type.name.toLowerCase())}
-function omNextivaSummary(plugin,license){const types=omNextivaTypes(license.fm);const people=plugin.employeeNotes().filter(e=>tagSet(e.fm).has('employee')||e.file.path.split('/').some(p=>/^employees?$/i.test(p))||Array.isArray(e.fm.Nextiva_Licenses)||types.some(t=>t.field&&Object.keys(e.fm).some(k=>k.toLowerCase()===t.field.toLowerCase())));const rows=types.map(t=>{const holders=people.filter(e=>omEmployeeLicenseValue(e.fm,t));const assigned=holders.length;return {...t,holders,assigned,available:t.purchased-assigned,cost:Math.round(t.purchased*t.rate*100)/100}});return {rows,total:Math.round(rows.reduce((n,x)=>n+x.cost,0)*100)/100,people}}
-class OMNextivaTypesModal extends Modal{
- constructor(app,plugin,license){super(app);this.plugin=plugin;this.license=license;this.rows=omNextivaTypes(license.fm).map(x=>({...x}))}
- onOpen(){this.render()}
- render(){const c=this.contentEl;c.empty();c.createEl('h2',{text:'Nextiva license types'});c.createEl('p',{text:'Each price is the monthly rate per purchased license. Charges include unused purchased licenses.'});for(const [i,row] of this.rows.entries()){const line=c.createDiv({cls:'ops-project-card'});new Setting(line).setName('License type').addText(t=>t.setValue(row.name).onChange(v=>row.name=v));new Setting(line).setName('Purchased seats').addText(t=>t.setValue(String(row.purchased)).onChange(v=>row.purchased=v));new Setting(line).setName('Monthly price per seat').addText(t=>t.setValue(String(row.rate)).onChange(v=>row.rate=v));new Setting(line).setName('Employee frontmatter property').setDesc('Optional. Match assignments using this existing property on employee notes (true or checked). Leave blank to use Nextiva_Licenses.').addText(t=>t.setPlaceholder('e.g. Nextiva_Voice').setValue(row.field??'').onChange(v=>row.field=v));new Setting(line).addButton(b=>b.setButtonText('Remove type').onClick(()=>{this.rows.splice(i,1);this.render()}))}new Setting(c).addButton(b=>b.setButtonText('Add license type').onClick(()=>{this.rows.push({name:'',purchased:0,rate:0});this.render()})).addButton(b=>b.setButtonText('Save license types').setCta().onClick(async()=>{const rows=this.rows.map(x=>({Name:String(x.name).trim(),Purchased:Number(x.purchased),Monthly_Rate:Number(x.rate),...(String(x.field??'').trim()?{Employee_Field:String(x.field).trim()}:{})}));if(rows.some(x=>!x.Name||!Number.isInteger(x.Purchased)||x.Purchased<0||!Number.isFinite(x.Monthly_Rate)||x.Monthly_Rate<0)||new Set(rows.map(x=>x.Name.toLowerCase())).size!==rows.length){new Notice('Enter unique names, nonnegative whole seat counts and valid monthly prices');return}try{await this.app.fileManager.processFrontMatter(this.license.file,fm=>{fm.License_Types=rows});this.license.fm.License_Types=rows;this.close();this.plugin.refresh();this.plugin.licenseSettingsTab?.display();new Notice('Nextiva license types saved')}catch(e){new Notice('Could not save license types: '+e.message)}}))}
+function omLicenseAssigned(value) {
+  return (
+    value === true ||
+    String(value ?? "")
+      .trim()
+      .toLowerCase() === "checked"
+  );
 }
-class OMNextivaAssignmentsModal extends Modal{
- constructor(app,plugin,license){super(app);this.plugin=plugin;this.license=license;this.search=''}
- onOpen(){this.render()}
- render(){const c=this.contentEl;c.empty();c.createEl('h2',{text:'Employee license assignments'});c.createEl('p',{text:'Assignments update existing employee-note frontmatter. Purchased seats, not assignments, determine the bill.'});new Setting(c).setName('Find employee').addText(t=>t.setValue(this.search).onChange(v=>{this.search=v;this.render()}));const summary=omNextivaSummary(this.plugin,this.license);
- for(const employee of summary.people.filter(e=>e.file.basename.toLowerCase().includes(this.search.toLowerCase())).slice(0,80)){const details=c.createEl('details');details.createEl('summary',{text:employee.file.basename});const selected=new Set(summary.rows.filter(t=>omEmployeeLicenseValue(employee.fm,t)).map(t=>t.name.toLowerCase()));for(const type of summary.rows)new Setting(details).setName(type.name).setDesc(type.field?'Property: '+type.field:'Property: Nextiva_Licenses').addToggle(t=>t.setValue(selected.has(type.name.toLowerCase())).onChange(v=>{if(v)selected.add(type.name.toLowerCase());else selected.delete(type.name.toLowerCase())}));
- new Setting(details).addButton(b=>b.setButtonText('Save assignments').onClick(async()=>{for(const type of summary.rows){const was=omEmployeeLicenseValue(employee.fm,type),now=selected.has(type.name.toLowerCase());if(!was&&now&&type.available<=0){new Notice('No available '+type.name+' seats. Increase purchased seats first.');return}}
- try{await this.app.fileManager.processFrontMatter(employee.file,fm=>{const current=Array.isArray(fm.Nextiva_Licenses)?fm.Nextiva_Licenses.map(String):typeof fm.Nextiva_Licenses==='string'?[fm.Nextiva_Licenses]:[];const unmapped=new Set(current.map(x=>x.toLowerCase()));for(const type of summary.rows){const enabled=selected.has(type.name.toLowerCase());if(type.field){const key=Object.keys(fm).find(k=>k.toLowerCase()===type.field.toLowerCase())??type.field;fm[key]=enabled}else{if(enabled)unmapped.add(type.name.toLowerCase());else unmapped.delete(type.name.toLowerCase())}}const previouslyNamed=new Map(current.map(x=>[x.toLowerCase(),x]));fm.Nextiva_Licenses=[...unmapped].map(x=>previouslyNamed.get(x)??summary.rows.find(t=>t.name.toLowerCase()===x)?.name??x)});const updated=this.app.metadataCache.getFileCache(employee.file)?.frontmatter;employee.fm=updated??employee.fm;this.plugin.refresh();this.render();new Notice('Assignments saved for '+employee.file.basename)}catch(error){new Notice('Unable to save assignments: '+error.message)}}))}}
+function iso(v) {
+  if (v instanceof Date) return dateISO(v);
+  if (typeof v === "string") return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+  return null;
 }
-class OMContractDateModal extends Modal{
- constructor(app,plugin,license){super(app);this.plugin=plugin;this.license=license;this.date=iso(license.fm.Next_Renewal)??''}
- onOpen(){const c=this.contentEl;c.createEl('h2',{text:'Contract renewal: '+this.license.file.basename});c.createEl('p',{text:'This date is independent of your billing schedule.'});new Setting(c).setName('Next contract renewal date').setDesc('YYYY-MM-DD').addText(t=>t.setPlaceholder('2027-08-04').setValue(this.date).onChange(value=>this.date=value.trim()));new Setting(c).addButton(b=>b.setButtonText('Save renewal date').setCta().onClick(async()=>{if(this.date&&!iso(this.date)){new Notice('Enter a valid YYYY-MM-DD date');return}try{await this.app.fileManager.processFrontMatter(this.license.file,fm=>{if(this.date)fm.Next_Renewal=this.date;else delete fm.Next_Renewal});this.license.fm.Next_Renewal=this.date;this.close();this.plugin.refresh();this.plugin.licenseSettingsTab?.display();new Notice('Contract renewal date saved')}catch(error){new Notice('Could not save renewal date: '+error.message)}}))}
+function omMonthToMonth(fm, file) {
+  const fields = [fm.Billing_Cycle, fm.Renewal_Type, fm.Renewal_Term, fm.Contract_Type, fm.Renewal];
+  return fields.some((v) => /^(month[ -]?to[ -]?month|monthly|m2m)$/i.test(String(v ?? "").trim()));
 }
-class OMAlertRulesModal extends Modal{
- constructor(app,plugin,license){super(app);this.plugin=plugin;this.license=license;this.rules={};for(const kind of ['renewal','billing','seats'])this.rules[kind]=omAlertRules(plugin,license.file,kind).map(x=>({...x}))}
- onOpen(){this.render()}
- render(){const c=this.contentEl;c.empty();c.createEl('h2',{text:'Alert colors & thresholds: '+this.license.file.basename});c.createEl('p',{cls:'setting-item-description',text:'Customize this license only. The first matching threshold decides the color; No alert hides that event. These settings do not add properties to your notes.'});
- for(const [kind,title,unit] of [['renewal','Contract renewal','days remaining'],['billing','Upcoming charges','days remaining'],...(omTracksSeats(this.license.fm)?[['seats','Available seats','seats remaining']]:[])]){
- const group=c.createDiv({cls:'ops-alert-rule-group'});group.createEl('h3',{text:title});group.createEl('p',{cls:'setting-item-description',text:'Use ascending thresholds. The last tier sets when alerts begin; choose No alert to suppress a tier.'});
- for(const [index,row] of this.rules[kind].entries()){const line=new Setting(group).setName(['Critical','Warning','Early notice'][index]+' ('+unit+')');line.addText(t=>t.setPlaceholder('Threshold').setValue(String(row.limit)).onChange(v=>row.limit=v));line.addDropdown(d=>{for(const color of OM_ALERT_COLORS)d.addOption(color,color==='none'?'No alert':color[0].toUpperCase()+color.slice(1));d.setValue(row.color).onChange(v=>row.color=v)})}
- }
- new Setting(c).addButton(b=>b.setButtonText('Restore defaults').onClick(()=>{for(const kind of ['renewal','billing','seats'])this.rules[kind]=OM_ALERT_DEFAULTS[kind].map(x=>({...x}));this.render()})).addButton(b=>b.setButtonText('Save alert rules').setCta().onClick(async()=>{for(const kind of ['renewal','billing','seats']){const rows=this.rules[kind].map(x=>({limit:Number(x.limit),color:x.color}));if(rows.some((x,i)=>!Number.isInteger(x.limit)||x.limit<0||x.limit>3650||!OM_ALERT_COLORS.includes(x.color)||i>0&&x.limit<rows[i-1].limit)){new Notice('Use whole-number thresholds in ascending order from 0 to 3650');return}this.rules[kind]=rows}try{const key=this.license.file.path;this.plugin.settings.licenseAlertRules={...(this.plugin.settings.licenseAlertRules||{}),[key]:this.rules};await this.plugin.saveData(this.plugin.settings);this.plugin.refresh();this.close();new Notice('Alert rules saved for '+this.license.file.basename)}catch(e){new Notice('Could not save alert rules: '+e.message)}}))}
+function inferredRenewal(fm) {
+  const explicit = iso(fm.Next_Renewal);
+  if (explicit) return { date: explicit, estimated: false };
+  const ordered = iso(fm.Ordered);
+  const term = Number(fm.Renewal);
+  if (!ordered || !Number.isInteger(term) || term <= 0 || term > 36500) return null;
+  const d = new Date(ordered + "T00:00:00Z");
+  if (!Number.isFinite(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() + term);
+  return { date: dateISO(d), estimated: true };
 }
-class OMLicenseFieldModal extends Modal{
- constructor(app,plugin,license){super(app);this.plugin=plugin;this.license=license;this.field=String(license.fm.License_Field??license.fm.License_Name??license.file.basename).trim()}
- onOpen(){const c=this.contentEl;c.createEl('h2',{text:'Employee field: '+this.license.file.basename});c.createEl('p',{text:'Use an existing property on employee notes to count assigned seats. The value should be true or checked. No employee notes are changed by saving this mapping.'});new Setting(c).setName('Employee frontmatter property').addText(t=>t.setValue(this.field).onChange(v=>this.field=v.trim()));new Setting(c).addButton(b=>b.setButtonText('Save field mapping').setCta().onClick(async()=>{if(!this.field){new Notice('Enter a frontmatter property name');return}try{await this.app.fileManager.processFrontMatter(this.license.file,fm=>{fm.License_Field=this.field});this.license.fm.License_Field=this.field;this.close();this.plugin.refresh();this.plugin.licenseSettingsTab?.display();new Notice('Employee field mapping saved')}catch(error){new Notice('Could not save mapping: '+error.message)}}))}
+function daysUntil(d) {
+  return Math.round(
+    (Date.parse(d + "T00:00:00Z") - Date.parse(dateISO(new Date()) + "T00:00:00Z")) / 86400000,
+  );
 }
-class OMSeatCountModal extends Modal{
- constructor(app,plugin,license){super(app);this.plugin=plugin;this.license=license;this.count=String(license.fm.License_Seats??'')}
- onOpen(){const c=this.contentEl;c.createEl('h2',{text:'Purchased seats: '+this.plugin.licenseField(this.license)});new Setting(c).setName('Number of seats purchased').addText(t=>t.setValue(this.count).onChange(v=>this.count=v));new Setting(c).addButton(b=>b.setButtonText('Save').setCta().onClick(async()=>{const n=Number(this.count);if(!Number.isInteger(n)||n<0){new Notice('Enter a nonnegative whole number');return}try{await this.app.fileManager.processFrontMatter(this.license.file,fm=>{fm.License_Seats=n});this.license.fm.License_Seats=n;this.close();this.plugin.refresh();if(this.plugin.licenseSettingsTab)this.plugin.licenseSettingsTab.display();new Notice('Seat count saved')}catch(e){new Notice(e.message)}}))}
+function classified(file, fm) {
+  const t = tagSet(fm),
+    p = file.path.toLowerCase();
+  if (t.has("ops-project") || (t.has("project") && p.includes("project"))) return "project";
+  if (t.has("invoice") || p.includes("/invoices/")) return "invoice";
+  if (
+    t.has("license") ||
+    t.has("licenses") ||
+    t.has("subscription") ||
+    t.has("renewal") ||
+    t.has("software_license") ||
+    (t.has("printer") && (fm.Renewal != null || fm.Next_Renewal != null || fm.Agreement_Types != null)) ||
+    fm.Agreement_Types != null ||
+    fm.License_Seats != null ||
+    fm.License_Field != null ||
+    fm.License_Types != null ||
+    fm.Next_Renewal != null ||
+    (fm.Next_Billing != null && fm.Billing != null) ||
+    (fm.License_Type != null &&
+      /maintenance|lease|agreement|software|subscription/i.test(String(fm.License_Type)))
+  )
+    return "renewal";
+  if (t.has("equip_up") || t.has("equip_upgrade") || t.has("equip_ug")) return "order";
+  if (t.has("order")) return "order";
+  if (t.has("device")) return "device";
+  return null;
 }
-class OMProjectModal extends Modal{
- constructor(app,plugin){super(app);this.plugin=plugin;this.name=''}
- onOpen(){const c=this.contentEl;c.createEl('h2',{text:'Create master project'});new Setting(c).setName('Project name').addText(t=>t.onChange(v=>this.name=v));new Setting(c).addButton(b=>b.setButtonText('Create project').setCta().onClick(async()=>{if(!this.name.trim()){new Notice('Project name required');return}const folder=this.plugin.settings.folder;const path=normalizePath(folder+'/'+this.name.trim().replace(/[\\\\/:*?"<>|]/g,'-')+'.md');try{if(!this.app.vault.getAbstractFileByPath(folder))await this.app.vault.createFolder(folder);if(this.app.vault.getAbstractFileByPath(path)){new Notice('Project already exists');return}const content='---\\ntags:\\n  - ops-project\\nStatus: planned\\nProject_Owner: '+JSON.stringify(this.owner)+'\\nTarget_Date: '+JSON.stringify(this.target)+'\\n---\\n# '+this.name+'\\n\\n## Scope\\n\\n## Decisions\\n\\n## Notes\\n';await this.app.vault.create(path,content);new Notice('Project created');this.close();this.plugin.refresh()}catch(e){new Notice(e.message)}}))}
+function status(fm) {
+  return String(fm.Status ?? fm.status ?? "")
+    .trim()
+    .toLowerCase();
 }
-class OMLinkModal extends Modal{
- constructor(app,plugin,project){super(app);this.plugin=plugin;this.project=project;this.search=''}
- onOpen(){this.render()}
- render(){const c=this.contentEl;c.empty();c.createEl('h2',{text:'Link records to '+this.project.basename});new Setting(c).setName('Search device, license or order').addText(t=>t.setValue(this.search).onChange(v=>{this.search=v;this.render()}));const options=this.plugin.records().filter(r=>r.file.path!==this.project.path&&['device','renewal','order'].includes(r.kind)&&r.file.basename.toLowerCase().includes(this.search.toLowerCase())).slice(0,40);for(const r of options){const line=new Setting(c).setName(r.file.basename).setDesc(r.kind+' • '+r.file.path);line.addButton(b=>b.setButtonText(this.plugin.linkedTo(r.fm,this.project)?'Unlink':'Link').onClick(async()=>{try{await this.app.fileManager.processFrontMatter(r.file,fm=>{const list=omRelated(fm,'Operations_Projects').map(omLinkValue).filter(Boolean);const linked=list.some(x=>omMatches(x,this.project));fm.Operations_Projects=linked?list.filter(x=>!omMatches(x,this.project)):[...list,this.project.path];if(!fm.Operations_Projects.length)delete fm.Operations_Projects});new Notice('Project links updated');this.plugin.refresh();this.render()}catch(e){new Notice('Could not update: '+e.message)}}))}}
-}
-
-const OM_ALERT_DEFAULTS={renewal:[{limit:30,color:'red'},{limit:60,color:'orange'},{limit:90,color:'yellow'}],billing:[{limit:30,color:'red'},{limit:60,color:'orange'},{limit:90,color:'yellow'}],seats:[{limit:2,color:'red'},{limit:5,color:'orange'},{limit:10,color:'none'}]};
-const OM_ALERT_COLORS=['red','orange','yellow','green','none'];
-function omAlertRules(plugin,file,kind){const raw=plugin.settings.licenseAlertRules?.[file.path]?.[kind];const defaults=OM_ALERT_DEFAULTS[kind];if(!Array.isArray(raw)||raw.length!==3)return defaults;const rows=raw.map((v,i)=>({limit:Number(v?.limit),color:String(v?.color??'')}));return rows.every((v,i)=>Number.isInteger(v.limit)&&v.limit>=0&&v.limit<=3650&&OM_ALERT_COLORS.includes(v.color)&&(i===0||v.limit>=rows[i-1].limit))?rows:defaults}
-function omAlertColor(plugin,file,kind,value){if(value===null||value===undefined||!Number.isFinite(value))return null;const rules=omAlertRules(plugin,file,kind);for(const rule of rules)if(value<=rule.limit)return rule.color==='none'?null:rule.color;return null}
-function omAlertDays(plugin,file,kind){return omAlertRules(plugin,file,kind)[2].limit}
-function omSeatCount(plugin,r){const types=omNextivaTypes(r.fm);return types.length?omNextivaSummary(plugin,r).rows.reduce((sum,v)=>sum+v.available,0):plugin.licenseInventory(r).available}
-function omRenewalAlertsEnabled(fm){return fm.Renewal_Alerts!==false&&String(fm.Renewal_Alerts??'').toLowerCase()!=='false'}
-function omBillingAlertsEnabled(fm){return fm.Billing_Alerts!==false&&String(fm.Billing_Alerts??'').toLowerCase()!=='false'}
-function omTracksSeats(fm){const raw=fm.Agreement_Types??fm.Agreement_Type??fm.License_Type??[];const kinds=(Array.isArray(raw)?raw:String(raw).split(',')).map(v=>String(v).trim().toLowerCase()).filter(Boolean);if(omNextivaTypes(fm).length>0)return true;if(kinds.length)return kinds.some(v=>['software seats','software seat','seat','seats','software','per-user','per user'].includes(v));return fm.License_Seats!==undefined&&fm.License_Seats!==null&&String(fm.License_Seats).trim()!==''}
-function omSeatAlertsEnabled(fm){return fm.Seat_Alerts!==false&&String(fm.Seat_Alerts??'').toLowerCase()!=='false'}
-function omRenewalEstimate(fm){const raw=fm.Cost;const amount=typeof raw==='number'?raw:Number(String(raw??'').trim().replace(/[$,]/g,''));if(raw===null||raw===undefined||String(raw).trim()===''||!Number.isFinite(amount)||amount<0)return null;return {amount:Math.round((amount+Number.EPSILON)*100)/100}}
-function omBillingCycle(fm){const value=String(fm.Billing??'').trim().toLowerCase();const months={'monthly':1,'month':1,'quarterly':3,'quarter':3,'annually':12,'annual':12,'yearly':12,'year':12,'semiannually':6,'semi-annually':6,'semiannual':6,'biannually':6,'biannual':6};return Object.prototype.hasOwnProperty.call(months,value)?{months:months[value],label:value.charAt(0).toUpperCase()+value.slice(1)}:null}
-function omBillingInfo(fm){const cycle=omBillingCycle(fm);const date=iso(fm.Next_Billing);if(!cycle||!date)return null;return {date,days:daysUntil(date),months:cycle.months,label:cycle.label,amount:omRenewalEstimate(fm)?.amount??null}}
-function omTermCost(fm){const charge=omRenewalEstimate(fm),cycle=omBillingCycle(fm),term=Number(fm.Renewal);if(!charge||!cycle||!Number.isInteger(term)||term<=0||term>36500)return null;const periods=Math.max(1,Math.round(term*12/(365.25*cycle.months)));return {total:Math.round(charge.amount*periods*100)/100,periods}}
-function omUSD(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n)}
-function omDashboardAction(r,plugin){const fm=r.fm;if(r.equipUp){const phase=String(fm.Approved??fm.approved??'Unassigned phase');const ordered=iso(fm.Ordered??fm.Order_Date),setup=iso(fm.Set_Up??fm.Set_up);const label=!ordered?'Confirm approval and order equipment':!setup?'Follow up on delivery and schedule Set_Up':'Confirm completion and update Status';return {priority:!ordered?20:!setup?40:65,date:ordered??'',label:label+' · Phase: '+phase,kind:'equipment'}}if(r.kind==='invoice'){const due=iso(fm.Due_Date),created=iso(fm.Date),age=created?-daysUntil(created):0;return {priority:due&&daysUntil(due)<0?5:age>7?15:due&&daysUntil(due)<=7?25:50,date:due??created??'',label:due&&daysUntil(due)<0?'Check overdue payment · Due '+due:age>7?'Follow up on unpaid invoice · Dated '+created:due?'Check payment · Due '+due:'Check payment · No due date',kind:'invoice'}}if(r.kind==='renewal'){const renewal=omMonthToMonth(fm,r.file)?null:inferredRenewal(fm);const renewalDays=renewal?daysUntil(renewal.date):null;const renewalDue=omRenewalAlertsEnabled(fm)&&!!omAlertColor(plugin,r.file,'renewal',renewalDays);const billing=omBillingAlertsEnabled(fm)?omBillingInfo(fm):null;const billingDue=billing&&!!omAlertColor(plugin,r.file,'billing',billing.days);const urgency=d=>d<0?0:d<=14?10:d<=30?30:45;const preferBilling=billingDue&&(!renewalDue||billing.date<renewal.date);const seatDue=omTracksSeats(fm)&&omSeatAlertsEnabled(fm)&&!!omAlertColor(plugin,r.file,'seats',omSeatCount(plugin,r));const label=preferBilling?'Upcoming charge · '+billing.date+(billing.days<0?' · Overdue '+(-billing.days)+' days':' · '+billing.days+' days remaining'):renewalDue?'Renew license or agreement package · '+renewal.date+(renewalDays<0?' · Overdue '+(-renewalDays)+' days':' · '+renewalDays+' days remaining'):seatDue?'Review license availability · '+omSeatCount(plugin,r)+' seats remaining':'Review license record';return {priority:Math.min(renewalDue?urgency(renewalDays):Infinity,billingDue?urgency(billing.days):Infinity,55),date:preferBilling?billing.date:renewalDue?renewal.date:'',label,kind:'renewal'}}return {priority:70,date:'',label:r.reason||'Follow up',kind:r.kind}}
-function omLicenseActiveAlerts(plugin,r){if(r.kind!=='renewal')return [];const fm=r.fm,alerts=[];const renewal=omMonthToMonth(fm,r.file)?null:inferredRenewal(fm);if(renewal&&omRenewalAlertsEnabled(fm)){const days=daysUntil(renewal.date),color=omAlertColor(plugin,r.file,'renewal',days);if(color)alerts.push({kind:'renewal',color,date:renewal.date,text:'Contract renewal: '+renewal.date+' · '+(days<0?'Overdue '+(-days)+' days':days+' days remaining')})}const billing=omBillingAlertsEnabled(fm)?omBillingInfo(fm):null;if(billing){const color=omAlertColor(plugin,r.file,'billing',billing.days);if(color)alerts.push({kind:'billing',color,date:billing.date,text:'Upcoming charge: '+billing.date+' · '+(billing.days<0?'Overdue '+(-billing.days)+' days':billing.days+' days remaining')+(billing.amount===null?'':' · '+omUSD(billing.amount))})}if(omTracksSeats(fm)&&omSeatAlertsEnabled(fm)){const available=omSeatCount(plugin,r),color=omAlertColor(plugin,r.file,'seats',available);if(color){const types=omNextivaTypes(fm);const purchased=types.length?types.reduce((sum,t)=>sum+t.purchased,0):plugin.licenseInventory(r).total;alerts.push({kind:'seats',color,date:null,text:'Seat availability: '+available+' of '+(purchased===null?'unknown':purchased)+' seats available'+(available<=0?' · Review assignments or purchased seats':'')})}}return alerts}
-function omDashboardDisplayColor(plugin,r){if(r.kind==='renewal'){const colors=omLicenseActiveAlerts(plugin,r).map(a=>a.color);return ['red','orange','yellow','green'].find(c=>colors.includes(c))??null}const due=r.kind==='invoice'?iso(r.fm.Due_Date):null;const days=due?daysUntil(due):null;const stale=r.kind==='invoice'&&r.attention&&iso(r.fm.Date)&&daysUntil(iso(r.fm.Date))<-7;return stale||days!==null&&days<=30?'red':days!==null&&days<=60?'orange':null}
-function omDashboardSortDate(plugin,r){if(r.kind==='renewal')return omLicenseActiveAlerts(plugin,r).filter(a=>a.date).map(a=>a.date).sort()[0]??'9999-12-31';return iso(r.fm.Due_Date)??iso(r.fm.Date)??'9999-12-31'}
-class OperationsView extends ItemView{
- constructor(leaf,plugin){super(leaf);this.plugin=plugin}
- getViewType(){return VIEW}getDisplayText(){return 'Operations Manager'}getIcon(){return 'layout-dashboard'}
- async onOpen(){await this.render()}
- renderInvoices(root,records){let sort='date';const controls=root.createDiv({cls:'ops-equipment-controls'});new Setting(controls).setName('Sort invoices by').addDropdown(d=>d.addOption('date','Date (newest first)').addOption('vendor','Vendor (A-Z)').setValue(sort).onChange(v=>{sort=v;draw()}));const area=root.createDiv({cls:'ops-invoice-groups'});const draw=()=>{area.empty();const ordered=[...records].sort((a,b)=>sort==='vendor'?String(a.fm.Vendor??'').localeCompare(String(b.fm.Vendor??''),undefined,{numeric:true,sensitivity:'base'})||a.file.basename.localeCompare(b.file.basename):String(b.fm.Date??'').localeCompare(String(a.fm.Date??''))||a.file.basename.localeCompare(b.file.basename));for(const [label,paid] of [['Unpaid',false],['Paid',true]]){const items=ordered.filter(r=>(status(r.fm)==='complete'||status(r.fm)==='paid'||String(r.fm.Paid_Date??'').trim()!=='')===paid);const key='invoices:status:'+(paid?'paid':'unpaid');const section=area.createEl('details',{cls:'ops-equipment-phase ops-invoice-section'});section.open=this.plugin.settings.collapsedSections?.[key]===true;section.addEventListener('toggle',()=>{if(this.plugin.settings.collapsedSections?.[key]===section.open)return;this.plugin.settings.collapsedSections={...(this.plugin.settings.collapsedSections||{}),[key]:section.open};this.plugin.saveData(this.plugin.settings)});section.createEl('summary',{text:label+' ('+items.length+')'});const list=section.createDiv({cls:'ops-equipment-list'});if(!items.length){list.createEl('small',{text:'No '+label.toLowerCase()+' invoices.'});continue}for(const r of items){const card=list.createDiv({cls:'ops-attention-item ops-equipment-card'});this.plugin.renderCardIcon(card,'invoice');const info=card.createDiv({cls:'ops-item-info'});const title=info.createEl('button',{cls:'ops-item-title',text:r.file.basename});title.onclick=()=>this.app.workspace.getLeaf(false).openFile(r.file);info.createEl('small',{text:'Date: '+(r.fm.Date??'Not set')+' · Vendor: '+(r.fm.Vendor??'Not set')});info.createEl('small',{text:r.reason||''});if(r.fm.Notes!==undefined&&r.fm.Notes!==null&&String(r.fm.Notes).trim()){const notes=info.createDiv({cls:'ops-equipment-note'});notes.createSpan({text:'Services: '});omCardLinkedText(notes,r.fm.Notes,this.app,r.file.path)}if(!paid){const btn=card.createEl('button',{cls:'ops-item-action',text:'Mark paid'});btn.onclick=()=>new PaidModal(this.app,this.plugin,r.file).open()}}}};draw()}
-
- renderLicenseOverviewInline(info,r){
- const plugin=this.plugin;
- const types=omNextivaTypes(r.fm);
- const multi=types.length>0;
- const inv=plugin.licenseInventory(r);
- const data=multi?omNextivaSummary(plugin,r):null;
- const purchased=multi?data.rows.reduce((n,x)=>n+x.purchased,0):inv.total;
- const assigned=multi?data.rows.reduce((n,x)=>n+x.assigned,0):inv.assigned;
- const available=purchased===null?null:purchased-assigned;
- const amount=omRenewalEstimate(r.fm)?.amount??null;
- const period=omBillingCycle(r.fm)?.label?.toLowerCase()??'billing cycle';
- const seatBased=omTracksSeats(r.fm);
- const line=seatBased?(purchased===null?'Purchased seats not set':purchased+' purchased · '+assigned+' assigned · '+available+' available'):'';
- const costLine=amount===null?'':omUSD(amount)+' / '+period;
- if(line||costLine)info.createEl('small',{cls:'ops-license-summary',text:[line,costLine].filter(Boolean).join(' · ')});
- if(!seatBased&&!/nextiva/i.test(r.file.basename))return;
- const key='licenses:inline:'+r.file.path;
- const details=info.createEl('details',{cls:'ops-license-inline-details'});
- details.open=plugin.settings.collapsedSections?.[key]===true;
- details.addEventListener('toggle',()=>{if(plugin.settings.collapsedSections?.[key]===details.open)return;plugin.settings.collapsedSections={...(plugin.settings.collapsedSections||{}),[key]:details.open};plugin.saveData(plugin.settings)});
- details.createEl('summary',{text:'License details'});
- const content=details.createDiv({cls:'ops-license-inline-body'});
- if(/nextiva/i.test(r.file.basename)&&!multi){
- content.createEl('p',{text:'No Nextiva license types configured yet.'});
- const add=content.createEl('button',{text:'Add license types'});
- add.onclick=()=>new OMNextivaTypesModal(this.app,plugin,r).open();
- }
- if(multi){
- content.createEl('p',{text:'Calculated license-type subtotal: '+omUSD(data.total)+' (comparison only; billed amount comes from Cost).'});
- const table=content.createEl('table');
- const header=table.createEl('tr');
- for(const title of ['Type','Purchased','Assigned','Available','Rate','Calculated subtotal'])header.createEl('th',{text:title});
- for(const type of data.rows){
- const tr=table.createEl('tr');
- for(const value of [type.name,type.purchased,type.assigned,type.available,omUSD(type.rate),omUSD(type.cost)])tr.createEl('td',{text:String(value)});
- const people=content.createDiv({cls:'ops-license-assignees'});
- people.createSpan({text:type.name+': '});
- if(!type.holders.length)people.createSpan({text:'No employees assigned'});
- for(const [i,employee] of type.holders.entries()){if(i)people.createSpan({text:', '});const link=people.createEl('button',{text:employee.file.basename});link.onclick=()=>this.app.workspace.getLeaf(false).openFile(employee.file)}
- }
- const edit=content.createEl('button',{text:'Manage license types'});
- edit.onclick=()=>new OMNextivaTypesModal(this.app,plugin,r).open();
- const assign=content.createEl('button',{text:'Manage assignments'});
- assign.onclick=()=>new OMNextivaAssignmentsModal(this.app,plugin,r).open();
- }else if(seatBased){
- if(amount!==null&&purchased!==null&&purchased>0)content.createEl('p',{text:'Derived average per purchased seat: '+omUSD(amount/purchased)+' / '+period});
- const employees=inv.employees.filter(e=>Object.entries(e.fm).some(([field,value])=>field.toLowerCase()===inv.field.toLowerCase()&&omLicenseAssigned(value)));
- content.createEl('p',{text:'Assigned employees: '+employees.length});
- for(const employee of employees){const button=content.createEl('button',{text:employee.file.basename});button.onclick=()=>this.app.workspace.getLeaf(false).openFile(employee.file)}
- const assign=content.createEl('button',{text:'Manage assignments'});
- assign.onclick=()=>new OMEmployeeLicenseModal(this.app,plugin,r,inv.employees).open();
- }
- }
-
- renderOrders(root,records){root.createEl('h2',{cls:'ops-equipment-heading',text:'Orders by Status'});const groups=new Map();for(const r of records){const raw=String(r.fm.Status??r.fm.status??'').trim();const name=raw||(r.fm.Ordered?'ordered':'not ordered');const label=name.toLowerCase()==='in progress'&&!r.fm.Ordered?'not ordered':name;if(!groups.has(label))groups.set(label,[]);groups.get(label).push(r)}const rank=name=>{const value=name.trim().toLowerCase();return value==='not ordered'?0:value==='in progress'?1:value==='ordered'?2:value==='complete'?3:4};const names=[...groups.keys()].sort((a,b)=>rank(a)-rank(b)||a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));if(!names.length)root.createEl('p',{text:'No orders found.'});for(const name of names){const items=groups.get(name).sort((a,b)=>a.file.basename.localeCompare(b.file.basename,undefined,{numeric:true,sensitivity:'base'}));const key='orders:status:'+name.toLowerCase();const details=root.createEl('details',{cls:'ops-equipment-phase'});details.open=this.plugin.settings.collapsedSections?.[key]===true;details.addEventListener('toggle',()=>{if(this.plugin.settings.collapsedSections?.[key]===details.open)return;this.plugin.settings.collapsedSections={...(this.plugin.settings.collapsedSections||{}),[key]:details.open};this.plugin.saveData(this.plugin.settings)});details.createEl('summary',{text:name.charAt(0).toUpperCase()+name.slice(1)+' ('+items.length+')'});const list=details.createDiv({cls:'ops-equipment-list'});for(const r of items){const card=list.createDiv({cls:'ops-attention-item ops-equipment-card'});this.plugin.renderCardIcon(card,'order');const info=card.createDiv({cls:'ops-item-info'});const title=info.createEl('button',{cls:'ops-item-title',text:r.file.basename});title.onclick=()=>this.app.workspace.getLeaf(false).openFile(r.file);const emp=r.fm.Employee??r.fm.Assigned_To;if(emp){const line=info.createEl('small');omCardLinkedText(line,emp,this.app,r.file.path)}const approval=r.fm.Approved;if(approval!==undefined&&approval!==null&&String(approval).trim()){const line=info.createDiv({cls:'ops-equipment-note'});line.createSpan({text:'Approved: '});omCardLinkedText(line,approval,this.app,r.file.path)}const notes=r.fm.Notes;if(notes!==undefined&&notes!==null&&String(notes).trim()){const line=info.createDiv({cls:'ops-equipment-note'});line.createSpan({text:'Notes: '});omCardLinkedText(line,notes,this.app,r.file.path)}if(tagSet(r.fm).has('equip_ug')||tagSet(r.fm).has('equip_upgrade')){const update=card.createEl('button',{cls:'ops-item-action',text:'Update'});update.onclick=()=>new OMDeviceWorkflowModal(this.app,this.plugin,r).open()}}}}
-
- async render(){const root=this.contentEl;const scroll=root.querySelector('.view-content')||root;const previousScroll=scroll.scrollTop;root.empty();root.addClass('ops-command');const rows=this.plugin.records();const nav=root.createDiv({cls:'ops-header'});const title=nav.createDiv();title.createEl('h2',{text:'Operations Command Center'});title.createEl('small',{text:'Your operations at a glance'});const actions=nav.createDiv({cls:'ops-actions'});for(const [name,fn] of [['Refresh',()=>this.render()],['New invoice',()=>new RecordModal(this.app,this.plugin,'invoice').open()],['New renewal',()=>new RecordModal(this.app,this.plugin,'renewal').open()],['New order',()=>new RecordModal(this.app,this.plugin,'order').open()],['Export Excel (.xlsx)',()=>new OMExportExcelModal(this.app,this.plugin).open()]]){const btn=actions.createEl('button',{text:name});btn.onclick=fn}
- const tabs=root.createDiv({cls:'ops-tabs'});const pages=[['Dashboard','dashboard'],['Equipment','device'],['Licenses & Renewals','renewal'],['Invoices','invoice'],['Orders','order']];this.page=this.page||'dashboard';for(const [label,key] of pages){const t=tabs.createEl('button',{text:label,cls:key===this.page?'ops-tab active':'ops-tab'});t.onclick=()=>{this.page=key;this.render()}}
- const due=rows.filter(r=>r.kind==='renewal'&&r.attention).length;const orders=rows.filter(r=>r.kind==='order'&&!r.done).length;const invoices=rows.filter(r=>r.kind==='invoice'&&!r.done).length;const stats=root.createDiv({cls:'ops-stats'});for(const [num,label,key] of [[due,'Renewals / charges due','renewal'],[orders,'Open orders','order'],[invoices,'Unpaid invoices','invoice']]){const stat=stats.createDiv({cls:'ops-stat'});const statIcon=stat.createSpan({cls:'ops-stat-icon'});const iconName=this.plugin.cardIcon(key);if(iconName!=='none')require('obsidian').setIcon(statIcon,iconName);stat.createEl('strong',{text:String(num)});stat.createEl('small',{text:label});stat.onclick=()=>{this.page=key;this.render()}}
- const selected=this.page==='dashboard'?rows.filter(r=>r.kind!=='project'&&r.attention&&!omTerminated(r.fm)&&((r.kind!=='order'&&r.kind!=='device')||r.equipUp)).sort((a,b)=>{const x=omDashboardAction(a,this.plugin),y=omDashboardAction(b,this.plugin);return x.priority-y.priority||(x.date||'9999').localeCompare(y.date||'9999')||a.file.basename.localeCompare(b.file.basename)}):rows.filter(r=>!omTerminated(r.fm)&&(this.page==='order'?r.kind==='order':this.page==='device'?((r.kind==='device'||r.kind==='order')&&(tagSet(r.fm).has('equip_ug')||tagSet(r.fm).has('equip_upgrade')||tagSet(r.fm).has('device'))):r.kind===this.page));if(this.page==='invoice'){this.renderInvoices(root,selected);return}if(this.page==='order'){this.renderOrders(root,selected);return}if(this.page==='device'){this.plugin.renderEquipmentPhases(root,selected.filter(r=>r.kind!=='invoice'),'status');return}if(this.page==='renewal'){const sort=this.licenseSort||'filename';new Setting(root.createDiv({cls:'ops-equipment-controls'})).setName('Sort licenses by').addDropdown(d=>d.addOption('filename','Filename (A-Z)').addOption('seats','Seats left (fewest first)').addOption('renewal','Next renewal date (soonest first)').setValue(sort).onChange(v=>{this.licenseSort=v;this.render()}));const compareName=(a,b)=>a.file.basename.localeCompare(b.file.basename,undefined,{numeric:true,sensitivity:'base'});selected.sort((a,b)=>{if(sort==='seats'){const av=this.plugin.licenseInventory(a).available,bv=this.plugin.licenseInventory(b).available;return (av===null?Infinity:av)-(bv===null?Infinity:bv)||compareName(a,b)}if(sort==='renewal'){const ad=omMonthToMonth(a.fm,a.file)?null:inferredRenewal(a.fm)?.date,bd=omMonthToMonth(b.fm,b.file)?null:inferredRenewal(b.fm)?.date;return (ad||'9999-12-31').localeCompare(bd||'9999-12-31')||compareName(a,b)}return compareName(a,b)});}if(this.page==='renewal')root.createEl('h2',{cls:'ops-equipment-heading',text:'Licenses & Renewals'});else if(this.page!=='dashboard')root.createEl('h3',{text:pages.find(p=>p[1]===this.page)?.[0]||'Records'});const list=root.createDiv({cls:'ops-attention'});const actionRows=this.page==='dashboard'?selected.filter(r=>!r.equipUp):selected;const dashboard=this.page==='dashboard';const seatAlerts=dashboard?rows.filter(r=>r.kind==='renewal'&&omTracksSeats(r.fm)&&omSeatAlertsEnabled(r.fm)&&!!omAlertColor(this.plugin,r.file,'seats',omSeatCount(this.plugin,r))):[];const grouped=new Map();for(const r of actionRows){grouped.set(r.file.path,{r,seat:null})}for(const r of seatAlerts){const inv=this.plugin.licenseInventory(r);const types=omNextivaTypes(r.fm);const seat=types.length?{...inv,available:omSeatCount(this.plugin,r),assigned:omNextivaSummary(this.plugin,r).rows.reduce((sum,x)=>sum+x.assigned,0),total:types.reduce((sum,x)=>sum+x.purchased,0)}:inv;if(grouped.has(r.file.path))grouped.get(r.file.path).seat=seat;else grouped.set(r.file.path,{r,seat})}const entries=[...grouped.values()].filter(e=>!dashboard||!['follow up','follow-up'].includes(status(e.r.fm))&&!tagSet(e.r.fm).has('follow_up')&&!tagSet(e.r.fm).has('follow-up'));if(dashboard)entries.sort((a,b)=>{const order={red:0,orange:1,yellow:2,green:3};const ac=omDashboardDisplayColor(this.plugin,a.r),bc=omDashboardDisplayColor(this.plugin,b.r);const rankA=ac===null?4:order[ac],rankB=bc===null?4:order[bc];return rankA-rankB||omDashboardSortDate(this.plugin,a.r).localeCompare(omDashboardSortDate(this.plugin,b.r))||a.r.file.basename.localeCompare(b.r.file.basename,undefined,{numeric:true,sensitivity:'base'})});if(!entries.length&&!(dashboard&&this.app.vault.getMarkdownFiles().some(file=>{const fm=this.app.metadataCache.getFileCache(file)?.frontmatter;return fm&&!tagSet(fm).has('archive')&&!tagSet(fm).has('meeting_notes')&&!tagSet(fm).has('call_notes')&&(['follow up','follow-up'].includes(status(fm))||tagSet(fm).has('follow_up')||tagSet(fm).has('follow-up'))}))&&!(dashboard&&this.app.vault.getMarkdownFiles().some(file=>{const fm=this.app.metadataCache.getFileCache(file)?.frontmatter;return fm&&!tagSet(fm).has('archive')&&!tagSet(fm).has('meeting_notes')&&!tagSet(fm).has('call_notes')&&tagSet(fm).has('equip_ug')&&status(fm)!=='complete'})))list.createEl('p',{text:'Nothing currently needs follow-up.'});for(const {r,seat} of entries){const color=dashboard?omDashboardDisplayColor(this.plugin,r):null;const item=list.createDiv({cls:'ops-attention-item'+(color?' ops-alert-'+color:'')});const icon=this.plugin.renderCardIcon(item,r.kind);const info=item.createDiv({cls:'ops-item-info'});const name=info.createEl('button',{cls:'ops-item-title',text:r.file.basename});name.onclick=()=>this.app.workspace.getLeaf(false).openFile(r.file);if(dashboard&&r.kind!=='renewal'&&r.kind!=='invoice'&&(r.kind==='device'||tagSet(r.fm).has('device')||tagSet(r.fm).has('equip_ug')||tagSet(r.fm).has('equip_upgrade')))omDashboardDeviceDetails(info,r,this.app,false);else if(dashboard&&r.kind==='renewal'){const active=omLicenseActiveAlerts(this.plugin,r);if(active.length){for(const alert of active)info.createEl('small',{cls:'ops-active-alert ops-active-alert-'+alert.color,text:alert.text})}else if(r.attention&&omRenewalAlertsEnabled(r.fm)&&!omMonthToMonth(r.fm,r.file)&&!inferredRenewal(r.fm))info.createEl('small',{text:'Action needed: Set contract renewal date'});}else if(!dashboard||r.attention)info.createEl('small',{text:dashboard?omDashboardAction(r,this.plugin).label:r.reason||r.kind});if(this.page==='renewal'&&r.kind==='renewal'){try{this.renderLicenseOverviewInline(info,r)}catch(error){console.error('Operations Manager: license details failed for '+r.file.path,error);info.createEl('small',{text:'Could not display license details: '+(error?.message||String(error))})}}if(!dashboard)item.createSpan({cls:'ops-item-status',text:r.attention?'Action needed':r.done?'Complete':'Tracked'});if(dashboard&&r.kind==='renewal'&&omBillingAlertsEnabled(r.fm)&&omBillingInfo(r.fm)&&!!omAlertColor(this.plugin,r.file,'billing',omBillingInfo(r.fm).days)){const charge=item.createEl('button',{cls:'ops-item-action',text:'Record charge'});charge.onclick=()=>new OMRecordChargeModal(this.app,this.plugin,r).open()}if(r.kind==='renewal'&&omRenewalAlertsEnabled(r.fm)&&inferredRenewal(r.fm)&&!omMonthToMonth(r.fm,r.file)&&!!omAlertColor(this.plugin,r.file,'renewal',daysUntil(inferredRenewal(r.fm).date))){const btn=item.createEl('button',{cls:'ops-item-action',text:'Renew'});btn.onclick=()=>new RenewModal(this.app,this.plugin,r.file,r.fm).open()}if(dashboard&&(r.kind==='device'||tagSet(r.fm).has('device')||tagSet(r.fm).has('equip_ug')||tagSet(r.fm).has('equip_upgrade'))){const btn=item.createEl('button',{cls:'ops-item-action',text:'Update'});btn.onclick=()=>new OMDeviceWorkflowModal(this.app,this.plugin,r).open()}if(r.kind==='invoice'&&r.attention){const btn=item.createEl('button',{cls:'ops-item-action',text:'Mark paid'});btn.onclick=()=>new PaidModal(this.app,this.plugin,r.file).open()}}
- if(this.page==='dashboard'){const existing=new Set(entries.map(e=>e.r.file.path));const followups=this.app.vault.getMarkdownFiles().filter(file=>!file.path.split('/').slice(0,-1).some(p=>p.toLowerCase()==='templates')).map(file=>({file,fm:this.app.metadataCache.getFileCache(file)?.frontmatter})).filter(x=>x.fm&&!omTerminated(x.fm)&&!['archive','archived'].includes(status(x.fm))&&!['archive','meeting_notes','call_notes'].some(t=>tagSet(x.fm).has(t))&&(status(x.fm)==='follow up'||status(x.fm)==='follow-up'||tagSet(x.fm).has('follow_up')||tagSet(x.fm).has('follow-up'))&&!existing.has(x.file.path)).sort((a,b)=>a.file.basename.localeCompare(b.file.basename,undefined,{numeric:true,sensitivity:'base'}));for(const r of followups){const card=list.createDiv({cls:'ops-attention-item'});this.plugin.renderCardIcon(card,'followup');const info=card.createDiv({cls:'ops-item-info'});const btn=info.createEl('button',{cls:'ops-item-title',text:r.file.basename});btn.onclick=()=>this.app.workspace.getLeaf(false).openFile(r.file);omDashboardDeviceDetails(info,r,this.app,true);if(tagSet(r.fm).has('device')||tagSet(r.fm).has('equip_ug')||tagSet(r.fm).has('equip_upgrade')){const update=card.createEl('button',{text:'Update',cls:'ops-item-action'});update.onclick=()=>new OMDeviceWorkflowModal(this.app,this.plugin,{...r,kind:'device'}).open()}}}
- if(this.page==='dashboard'){const upgrades=this.app.vault.getMarkdownFiles().filter(file=>!file.path.split('/').slice(0,-1).some(part=>part.toLowerCase()==='templates')).map(file=>({file,fm:this.app.metadataCache.getFileCache(file)?.frontmatter})).filter(x=>x.fm&&!tagSet(x.fm).has('archive')&&!tagSet(x.fm).has('meeting_notes')&&!tagSet(x.fm).has('call_notes')&&tagSet(x.fm).has('equip_ug')&&status(x.fm)!=='complete').map(x=>({...x,kind:'order',equipUp:true,attention:true}));if(upgrades.length)this.plugin.renderEquipmentPhases(root,upgrades)}
- root.createEl('p',{cls:'ops-footnote',text:'Data from your existing Markdown notes. Export creates a formatted Excel workbook. No source notes are modified by browsing or exporting.'});scroll.scrollTop=previousScroll}
-
-}
-class OMExportExcelModal extends Modal{
- constructor(app,plugin){super(app);this.plugin=plugin;this.selection='tracked';this.allProperties=false}
- onOpen(){this.render()}
- render(){const c=this.contentEl;c.empty();c.createEl('h2',{text:'Export to Excel'});c.createEl('p',{cls:'setting-item-description',text:'Choose which notes to export. Tag exports match YAML frontmatter tags only, even for notes outside the Operations Manager tabs. Inline tags in the note body are ignored.'});
- const tags=this.plugin.exportTagNames();
- new Setting(c).setName('What to export').setDesc('Filter only by YAML frontmatter tags, such as #device, #license and #person.').addDropdown(d=>{d.addOption('tracked','Operations Manager records (current export)');d.addOption('all','All Markdown notes');for(const tag of tags)d.addOption('tag:'+tag,'#'+tag);d.setValue(this.selection).onChange(value=>{this.selection=value;this.allProperties=value!=='tracked';this.render()})});
- new Setting(c).setName('Include every frontmatter property').setDesc('Creates a column for each property found across the selected notes, including custom fields. Nested values are kept as readable text.').addToggle(t=>t.setValue(this.allProperties).onChange(value=>{this.allProperties=value;this.updateCount()}));
- this.countEl=c.createEl('p',{cls:'ops-footnote'});
- this.updateCount();
- new Setting(c).addButton(b=>b.setButtonText('Cancel').onClick(()=>this.close())).addButton(b=>b.setButtonText('Export .xlsx').setCta().onClick(async()=>{const notes=this.plugin.exportSourceNotes(this.selection);if(!notes.length){new Notice('No matching notes to export');return}if(await this.plugin.exportXLSX(notes,{selection:this.selection,allProperties:this.allProperties}))this.close()}))
- }
- updateCount(){if(!this.countEl)return;const notes=this.plugin.exportSourceNotes(this.selection);const props=new Set();if(this.allProperties)for(const note of notes)for(const key of Object.keys(note.fm||{}))if(key!=='position')props.add(key);this.countEl.setText(notes.length+' notes selected'+(this.allProperties?' · '+props.size+' frontmatter properties found':' · standard Operations Manager columns'))}
-}
-class RecordModal extends Modal{
- constructor(app,plugin,kind){super(app);this.plugin=plugin;this.kind=kind;this.fields={}}
- onOpen(){const c=this.contentEl;c.empty();c.createEl('h2',{text:'New '+this.kind});const specs={invoice:[['Vendor','Vendor'],['Amount','Cost'],['Due date (YYYY-MM-DD)','Due_Date'],['Service period start','Service_Start'],['Service period end','Service_End'],['Services covered / notes','Notes']],renewal:[['Vendor','Vendor'],['Original contract date','Contract_Date'],['Next renewal (YYYY-MM-DD)','Next_Renewal'],['Term in months','Renewal_Term_Months'],['Cost','Cost']],order:[['Vendor','Vendor'],['Approved by / date / phase','Approved'],['Ordered date','Ordered'],['Assigned employee','Employee'],['Replaces (wiki-link)','To_Replace']]};new Setting(c).setName('Note title').addText(t=>t.onChange(v=>this.title=v));for(const [label,key] of specs[this.kind])new Setting(c).setName(label).addText(t=>t.onChange(v=>this.fields[key]=v));new Setting(c).addButton(b=>b.setButtonText('Create note').setCta().onClick(async()=>{if(!this.title?.trim()){new Notice('Enter a note title');return}const folder=this.plugin.settings.folder;const path=normalizePath(folder+'/'+this.title.trim().replace(/[\\/:*?"<>|]/g,'-')+'.md');if(this.app.vault.getAbstractFileByPath(path)){new Notice('A note with that name already exists');return}try{if(!this.app.vault.getAbstractFileByPath(folder))await this.app.vault.createFolder(folder);const fm={tags:[this.kind==='renewal'?'license':this.kind],Status:this.kind==='invoice'?'unpaid':'to do',...this.fields};const yaml=Object.entries(fm).filter(([,v])=>v!==''&&v!=null).map(([k,v])=>k+': '+(Array.isArray(v)?'\n  - '+v.join('\n  - '):JSON.stringify(v))).join('\n');await this.app.vault.create(path,'---\n'+yaml+'\n---\n');new Notice('Created '+path);this.close();this.plugin.refresh()}catch(e){new Notice('Could not create note: '+e.message)}}))}
- onClose(){this.contentEl.empty()}
-}
-class OMBillingModal extends Modal{
- constructor(app,plugin,record){super(app);this.plugin=plugin;this.record=record;this.cycle=String(record.fm.Billing??'');this.date=iso(record.fm.Next_Billing)??''}
- onOpen(){const c=this.contentEl;c.createEl('h2',{text:'Billing schedule: '+this.record.file.basename});c.createEl('p',{text:'Billing is separate from contract renewal. Cost is the total amount charged each billing cycle, regardless of License_Seats.'});new Setting(c).setName('Billing frequency').addDropdown(d=>{for(const [value,label] of [['','Not set'],['Monthly','Monthly'],['Quarterly','Quarterly'],['Semiannually','Every 6 months'],['Annually','Annually']])d.addOption(value,label);if(this.cycle&&!['Monthly','Quarterly','Semiannually','Annually'].includes(this.cycle))d.addOption(this.cycle,this.cycle);d.setValue(this.cycle).onChange(v=>this.cycle=v)});new Setting(c).setName('Next billing date').setDesc('YYYY-MM-DD').addText(t=>t.setPlaceholder('2026-11-01').setValue(this.date).onChange(v=>this.date=v.trim()));new Setting(c).addButton(b=>b.setButtonText('Save billing').setCta().onClick(async()=>{if(this.cycle&&!omBillingCycle({Billing:this.cycle})){new Notice('Choose a supported billing frequency');return}if(this.date&&!iso(this.date)){new Notice('Enter a valid YYYY-MM-DD date');return}try{await this.app.fileManager.processFrontMatter(this.record.file,fm=>{if(this.cycle)fm.Billing=this.cycle;else delete fm.Billing;if(this.date)fm.Next_Billing=this.date;else delete fm.Next_Billing});this.record.fm.Billing=this.cycle;this.record.fm.Next_Billing=this.date;this.close();this.plugin.refresh();if(this.plugin.licenseSettingsTab)this.plugin.licenseSettingsTab.display();new Notice('Billing schedule saved')}catch(e){new Notice('Unable to save billing: '+e.message)}}))}
-}
-class OMRecordChargeModal extends Modal{
- constructor(app,plugin,record){super(app);this.plugin=plugin;this.record=record}
- onOpen(){const current=omBillingInfo(this.record.fm);const c=this.contentEl;c.createEl('h2',{text:'Record billing charge'});if(!current){c.createEl('p',{text:'Set Billing and Next_Billing in plugin settings first.'});return}const next=addMonths(current.date,current.months);c.createEl('p',{text:'Current charge date: '+current.date});c.createEl('p',{text:'Next charge date: '+next});if(current.amount!==null)c.createEl('p',{text:'Estimated charge: '+omUSD(current.amount)});c.createEl('p',{text:'Confirm only after this scheduled charge has occurred. The contract renewal date will not change.'});new Setting(c).addButton(b=>b.setButtonText('Record charge').setCta().onClick(async()=>{try{await this.app.fileManager.processFrontMatter(this.record.file,fm=>{if(iso(fm.Next_Billing)!==current.date)throw Error('Billing date changed; reopen this dialog');const history=Array.isArray(fm.Billing_History)?fm.Billing_History:fm.Billing_History?[fm.Billing_History]:[];if(!history.some(v=>iso(v)===current.date))history.push(current.date);fm.Billing_History=history;fm.Last_Billed=current.date;fm.Next_Billing=next});this.record.fm.Next_Billing=next;this.close();this.plugin.refresh();if(this.plugin.licenseSettingsTab)this.plugin.licenseSettingsTab.display();new Notice('Charge recorded; next billing date updated')}catch(e){new Notice('Unable to record charge: '+e.message)}}))}
-}
-class RenewModal extends Modal{
- constructor(app,plugin,file,fm){super(app);this.plugin=plugin;this.file=file;this.fm=fm}
- onOpen(){const c=this.contentEl;c.createEl('h2',{text:'Complete renewal: '+this.file.basename});const current=inferredRenewal(this.fm);if(!current){c.createEl('p',{text:'Manual review required: enter a confirmed Next_Renewal date, or a valid Ordered date and Renewal term in days.'});return}
- const days=Number(this.fm.Renewal),months=termMonths(this.fm);const variable=/variable|manual|negotiat|tbd|unknown|custom/i.test(String(this.fm.Renewal??'')+' '+String(this.fm.Renewal_Term??'')+' '+String(this.fm.Renewal_Type??''));const fixedDays=Number.isInteger(days)&&days>0&&days<=36500;const fixedMonths=months!=null;if(variable||(!fixedDays&&!fixedMonths)){c.createEl('p',{text:'Manual review required: renewal term is variable, missing, or not a positive number of days/months. No automatic date advancement will occur.'});return}
- const old=current.date;let next;if(fixedDays){const d=new Date(old+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+days);next=dateISO(d)}else next=addMonths(old,months);
- c.createEl('p',{text:'Current renewal: '+old+(current.estimated?' (estimated)':'')});c.createEl('p',{text:'Next renewal after completion: '+next});c.createEl('p',{text:'This preserves Ordered, appends the current renewal to history, and creates a follow-up task in this note.'});new Setting(c).addButton(b=>b.setButtonText('Confirm completion').setCta().onClick(async()=>{try{await this.app.fileManager.processFrontMatter(this.file,fm=>{const check=inferredRenewal(fm);if(!check||check.date!==old)throw Error('Renewal date changed; reopen this dialog');const history=Array.isArray(fm.Renewal_History)?fm.Renewal_History:fm.Renewal_History?[fm.Renewal_History]:[];if(!history.some(v=>iso(v)===old))history.push(old);fm.Renewal_History=history;fm.Last_Renewed=old;fm.Next_Renewal=next;fm.Renewal_Review_Required=false});const note=await this.app.vault.read(this.file);const task='- [ ] Review renewal for '+this.file.basename+' 📅 '+next; if(!note.includes(task))await this.app.vault.append(this.file,'\\n## Renewal follow-up\\n'+task+'\\n');new Notice('Renewal completed; history, next date and reminder saved');this.close();this.plugin.refresh()}catch(e){new Notice('Renewal needs review: '+e.message)}}))}
-}
-class PaidModal extends Modal{
- constructor(app,plugin,file){super(app);this.plugin=plugin;this.file=file;this.date=dateISO(new Date())}
- onOpen(){const c=this.contentEl;c.createEl('h2',{text:'Mark invoice paid'});new Setting(c).setName('Payment date').addText(t=>t.setValue(this.date).onChange(v=>this.date=v));new Setting(c).addButton(b=>b.setButtonText('Confirm payment').setCta().onClick(async()=>{if(!iso(this.date)){new Notice('Use YYYY-MM-DD');return}try{await this.app.fileManager.processFrontMatter(this.file,fm=>{fm.Status='complete';fm.Paid_Date=this.date});new Notice('Invoice marked paid');this.close();this.plugin.refresh()}catch(e){new Notice(e.message)}}))}
-}
-function omCardLinkedText(parent,value,app,sourcePath){const text=Array.isArray(value)?value.map(String).join(', '):String(value??'');const parts=text.split(/(\[\[[^\]]+\]\])/g);for(const part of parts){const match=part.match(/^\[\[([^\]]+)\]\]$/);if(!match){parent.createSpan({text:part});continue}const [target,alias]=match[1].split('|');const link=parent.createEl('a',{cls:'internal-link',text:alias||target});link.href='#';link.onclick=e=>{e.preventDefault();e.stopPropagation();app.workspace.openLinkText(target,sourcePath,false)}}}
-function omDashboardDeviceDetails(info,record,app,followUp){const employee=record.fm.Employee??record.fm.Assigned_To;const hasEmployee=employee!==undefined&&employee!==null&&String(employee).trim()!=='';if(hasEmployee||followUp){const line=info.createEl('small');if(hasEmployee)omCardLinkedText(line,employee,app,record.file.path);if(followUp)line.createSpan({text:(hasEmployee?' · ':'')+'Follow up'})}const notes=record.fm.Notes;if(notes!==undefined&&notes!==null&&String(notes).trim()){const noteLine=info.createDiv({cls:'ops-equipment-note'});noteLine.createSpan({text:'Notes: '});omCardLinkedText(noteLine,notes,app,record.file.path)}}
-const OM_CARD_ICONS={renewal:'clock',invoice:'file-text',device:'laptop',order:'package',followup:'flag'};
-const OM_LEGACY_ICONS={'◷':'clock','▤':'file-text','▭':'laptop','▣':'package','◉':'circle-dot','◆':'diamond','★':'star','⚑':'flag','✓':'check','!':'alert-circle','•':'dot','—':'none'};
-class OMIconPicker extends require('obsidian').SuggestModal{
- constructor(app,plugin,kind,label,onPick){super(app);this.plugin=plugin;this.kind=kind;this.label=label;this.onPick=onPick;this.setPlaceholder('Search Lucide icons by name...');this.setInstructions([{command:'↑↓',purpose:'Navigate'},{command:'↵',purpose:'Select'}]);this.icons=['none',...require('obsidian').getIconIds().sort()];}
- getSuggestions(query){const q=query.trim().toLowerCase().replace(/\\s+/g,'-');return this.icons.filter(id=>id.includes(q)).slice(0,100)}
- renderSuggestion(id,el){el.addClass('ops-icon-suggestion');const preview=el.createSpan({cls:'ops-icon-preview'});if(id!=='none')require('obsidian').setIcon(preview,id);el.createSpan({text:id==='none'?'No icon':id.replace(/-/g,' ')});}
- onChooseSuggestion(id){this.onPick(id)}
-}
-class OMEmbeddedDashboard extends require('obsidian').MarkdownRenderChild{
- constructor(el,plugin){super(el);this.contentEl=el;this.plugin=plugin;this.app=plugin.app;this.page='dashboard'}
- async onload(){this.plugin.embeddedDashboards.add(this);await this.render()}
- onunload(){this.plugin.embeddedDashboards.delete(this)}
- async render(){return OperationsView.prototype.render.call(this)}
- renderInvoices(root,records){return OperationsView.prototype.renderInvoices.call(this,root,records)}
- renderOrders(root,records){return OperationsView.prototype.renderOrders.call(this,root,records)}
- renderLicenseOverviewInline(info,record){return OperationsView.prototype.renderLicenseOverviewInline.call(this,info,record)}
-}
-module.exports=class OperationsManager extends Plugin{
- async onload(){this.embeddedDashboards=new Set();this.registerMarkdownCodeBlockProcessor('operations-manager',(_source,el,ctx)=>{ctx.addChild(new OMEmbeddedDashboard(el,this))});this.settings=Object.assign({folder:'Operations Records',renewalWarningDays:90,cardIcons:{},collapsedSections:{}},await this.loadData());this.settings.renewalWarningDays=90;this.registerView(VIEW,leaf=>new OperationsView(leaf,this));this.addRibbonIcon('layout-dashboard','Open Operations Manager',()=>this.activate());this.addCommand({id:'open-dashboard',name:'Open Operations Manager',callback:()=>this.activate()});this.addSettingTab(new (class extends require('obsidian').PluginSettingTab{display(){this.plugin.licenseSettingsTab=this;this.containerEl.empty();this.containerEl.createEl('h2',{text:'Operations Manager'});this.containerEl.createEl('h3',{text:'General'});new Setting(this.containerEl).setName('Folder for new records').setDesc('Where new invoices, orders and license notes are created.').addText(t=>t.setValue(this.plugin.settings.folder).onChange(async v=>{this.plugin.settings.folder=v;await this.plugin.saveData(this.plugin.settings)}));const iconSection=this.containerEl.createEl('details',{cls:'ops-settings-icon-section'});iconSection.createEl('summary',{text:'Customize card icons'});iconSection.createEl('p',{cls:'setting-item-description',text:'Optional. Choose a Lucide icon for each Dashboard card type.'});for(const [kind,label] of [['renewal','Renewals & licenses'],['invoice','Invoices'],['device','Equipment'],['order','Orders'],['followup','Follow up']]){const setting=new Setting(iconSection).setName(label);const selected=this.plugin.cardIcon(kind);const preview=setting.controlEl.createSpan({cls:'ops-icon-preview'});if(selected!=='none')require('obsidian').setIcon(preview,selected);setting.addButton(b=>b.setButtonText(selected==='none'?'No icon':selected).onClick(()=>new OMIconPicker(this.app,this.plugin,kind,label,async icon=>{this.plugin.settings.cardIcons={...(this.plugin.settings.cardIcons||{}),[kind]:icon};await this.plugin.saveData(this.plugin.settings);this.plugin.refresh();this.display()}).open()))}this.plugin.renderLicenseInventory(this.containerEl,this.plugin.records().filter(r=>r.kind==='renewal').sort((a,b)=>a.file.basename.localeCompare(b.file.basename,undefined,{numeric:true,sensitivity:'base'})))}})(this.app,this));this.renewalSyncPending=new Set();this.registerEvent(this.app.metadataCache.on('changed',file=>{this.populateNextRenewal(file);this.refresh()}));this.app.workspace.onLayoutReady(()=>{for(const file of this.app.vault.getMarkdownFiles())this.populateNextRenewal(file)})}
- cardIcon(kind){const value=this.settings.cardIcons?.[kind]??OM_CARD_ICONS[kind]??'circle';return OM_LEGACY_ICONS[value]??value}
- renderCardIcon(parent,kind){const name=this.cardIcon(kind);const holder=parent.createSpan({cls:'ops-item-icon'});if(name!=='none')require('obsidian').setIcon(holder,name);return holder}
- async populateNextRenewal(file){if(!file||file.extension!=='md'||this.renewalSyncPending.has(file.path)||file.path.split('/').slice(0,-1).some(p=>p.toLowerCase()==='templates'))return;const fm=this.app.metadataCache.getFileCache(file)?.frontmatter;if(!fm||omTerminated(fm)||classified(file,fm)!=='renewal'||omMonthToMonth(fm,file)||fm.Next_Renewal!=null&&String(fm.Next_Renewal).trim()!=='')return;const next=inferredRenewal(fm);if(!next||!next.estimated)return;this.renewalSyncPending.add(file.path);try{await this.app.fileManager.processFrontMatter(file,front=>{if(front.Next_Renewal==null||String(front.Next_Renewal).trim()===''){const computed=inferredRenewal(front);if(computed?.estimated)front.Next_Renewal=computed.date}})}catch(e){console.warn('Operations Manager: could not populate Next_Renewal for '+file.path,e)}finally{this.renewalSyncPending.delete(file.path)}}
- records(){const result=[];for(const file of this.app.vault.getMarkdownFiles()){if(file.path.split('/').slice(0,-1).some(part=>part.toLowerCase()==='templates'))continue;const fm=this.app.metadataCache.getFileCache(file)?.frontmatter;if(!fm)continue;if(omTerminated(fm))continue;if(tagSet(fm,file,this.app).has('call_notes')||tagSet(fm,file,this.app).has('meeting_notes'))continue;const tags=tagSet(fm,file,this.app);const kind=tags.has('equip_ug')?'order':classified(file,fm);if(!kind)continue;const st=status(fm);const done=['paid','complete','completed','deployed','closed','retired','unused','in stock','spare','available','cancelled','canceled'].includes(st);if(['archive','archived'].includes(st)||tags.has('archive'))continue;let reason='',attention=false;const monthly=kind==='renewal'&&omMonthToMonth(fm,file);const renewal=monthly?null:inferredRenewal(fm);if(kind==='renewal'){if(monthly){reason='Month-to-month · No expiration'}else if(renewal){const days=daysUntil(renewal.date);const qualifier=renewal.estimated?'Estimated renewal':'Renewal';reason=qualifier+' '+renewal.date;if(omRenewalAlertsEnabled(fm)&&omAlertColor(this,file,'renewal',days)){attention=true;reason+=days<0?' (past due by '+(-days)+' days)':' (in '+days+' days)'}}else{reason='Renewal date needs review: enter Next_Renewal or Ordered and Renewal (days)';attention=omRenewalAlertsEnabled(fm)}const billing=omBillingAlertsEnabled(fm)?omBillingInfo(fm):null;if(billing&&omAlertColor(this,file,'billing',billing.days)){attention=true;if(!renewal||!omRenewalAlertsEnabled(fm)||!omAlertColor(this,file,'renewal',daysUntil(renewal.date)))reason='Upcoming charge '+billing.date+(billing.days<0?' (past due by '+(-billing.days)+' days)':' (in '+billing.days+' days)')}}if(kind==='invoice'){const paid=['paid','complete','completed'].includes(st)||fm.Paid===true||!!iso(fm.Payment_Date??fm.Paid_Date);const due=iso(fm.Due_Date);const invoiceDate=iso(fm.Date);reason=paid?'Paid':(invoiceDate?'Invoice date '+invoiceDate+' · ':'')+(due?'Unpaid · Due '+due:'Unpaid · Due date not recorded');attention=!paid}if(kind==='project'){reason=st||'Planned';attention=false}if(kind==='order'){reason=st||'Status not set';attention=!done}if(kind==='device'){reason=st||'Status not set';attention=!done&&['in progress','pending','ordered','to do','awaiting setup'].includes(st)}if((kind==='order'||kind==='device')&&(tags.has('equip_ug')||tags.has('equip_upgrade')||tags.has('equip_ug'))){const ordered=iso(fm.Ordered??fm.Order_Date);const setup=iso(fm.Set_Up??fm.Set_up);attention=tags.has('equip_ug')?st!=='complete':!ordered||!setup;reason=st==='complete'?'Complete':!ordered?'Not ordered — Ordered date missing':!setup?'Ordered '+ordered+' — Set_Up date missing':'Follow-up needed · Status: '+(st||'not set')}result.push({file,fm,kind,attention,reason,done,equipUp:tags.has('equip_ug')})}return result.sort((a,b)=>Number(b.attention)-Number(a.attention)||a.file.basename.localeCompare(b.file.basename))}
- licenseField(license){return String(license.fm.License_Field??license.fm.License_Name??license.file.basename).trim()}
- employeeNotes(){return this.app.vault.getMarkdownFiles().filter(file=>!file.path.split('/').slice(0,-1).some(p=>p.toLowerCase()==='templates')).map(file=>({file,fm:this.app.metadataCache.getFileCache(file)?.frontmatter})).filter(e=>e.fm&&!omTerminated(e.fm)&&!tagSet(e.fm).has('call_notes')&&!tagSet(e.fm).has('meeting_notes')&&!tagSet(e.fm).has('archive'))}
- licenseInventory(license){const field=this.licenseField(license);const employees=this.employeeNotes().filter(e=>Object.keys(e.fm).some(k=>k.toLowerCase()===field.toLowerCase())||tagSet(e.fm).has('employee')||e.file.path.split('/').some(p=>/^employees?$/i.test(p)));employees.sort((a,b)=>a.file.basename.localeCompare(b.file.basename,undefined,{sensitivity:'base',numeric:true}));const assigned=employees.filter(e=>Object.entries(e.fm).some(([k,v])=>k.toLowerCase()===field.toLowerCase()&&omLicenseAssigned(v))).length;const raw=license.fm.License_Seats;const total=raw!==undefined&&raw!==null&&raw!==''&&Number.isInteger(Number(raw))&&Number(raw)>=0?Number(raw):null;return{field,employees,assigned,total,available:total===null?null:total-assigned}}
- renderLicenseInventory(root,records){
- const section=root.createDiv({cls:'ops-settings-licenses'});
- section.createEl('h3',{text:'Licenses & agreements'});
- section.createEl('p',{cls:'setting-item-description',text:'Select a vendor to manage its alerts, billing, seats and assignments. Your existing notes remain the source of truth.'});
- const toolbar=section.createDiv({cls:'ops-settings-toolbar'});
- const search=toolbar.createEl('input',{type:'search',placeholder:'Find a license or vendor…',cls:'ops-settings-search'});
- search.setAttribute('aria-label','Search licenses');
- const count=toolbar.createSpan({cls:'ops-settings-count'});
- const list=section.createDiv({cls:'ops-settings-list'});
- const show=()=>{list.empty();const filtered=records.filter(r=>r.file.basename.toLowerCase().includes(search.value.trim().toLowerCase()));count.setText(filtered.length+' of '+records.length);if(!filtered.length){list.createEl('p',{cls:'setting-item-description',text:'No matching licenses.'});return}
- for(const license of filtered){
- const inv=this.licenseInventory(license),multi=omNextivaTypes(license.fm),hasTypes=multi.length>0,seatBased=omTracksSeats(license.fm);
- const summary=hasTypes?omNextivaSummary(this,license):null;
- const bought=hasTypes?summary.rows.reduce((n,x)=>n+x.purchased,0):inv.total;
- const used=hasTypes?summary.rows.reduce((n,x)=>n+x.assigned,0):inv.assigned;
- const available=bought===null?null:bought-used;
- const charge=omRenewalEstimate(license.fm)?.amount??null;
- const frequency=omBillingCycle(license.fm)?.label?.toLowerCase()??'cycle';
- const key='settings:license:'+license.file.path;
- const details=list.createEl('details',{cls:'ops-settings-license'});
- details.open=this.settings.collapsedSections?.[key]===true;
- details.addEventListener('toggle',()=>{if(this.settings.collapsedSections?.[key]===details.open)return;this.settings.collapsedSections={...(this.settings.collapsedSections||{}),[key]:details.open};this.saveData(this.settings)});
- const head=details.createEl('summary',{cls:'ops-settings-license-summary'});
- const heading=head.createSpan({cls:'ops-settings-license-name',text:license.file.basename});
- const chips=head.createSpan({cls:'ops-settings-license-meta'});
- if(seatBased&&bought!==null)chips.createSpan({text:available+' available / '+bought+' purchased'});
- if(charge!==null)chips.createSpan({text:omUSD(charge)+' / '+frequency});
- const body=details.createDiv({cls:'ops-settings-license-body'});
- const actions=body.createDiv({cls:'ops-settings-actions'});
- const open=actions.createEl('button',{text:'Open source note'});open.onclick=()=>this.app.workspace.getLeaf(false).openFile(license.file);
- const agreement=actions.createEl('button',{text:'Agreement types'});agreement.onclick=()=>new OMAgreementTypesModal(this.app,this,license).open();
- const alerts=body.createDiv({cls:'ops-settings-group'});alerts.createEl('h4',{text:'Dashboard alerts'});
- alerts.createEl('p',{cls:'setting-item-description',text:'Choose what deserves attention. Renewal colors keep the existing 90-day warning system.'});
- for(const [field,label,description,enabled] of [
- ['Renewal_Alerts','Contract renewals','Notify when this contract approaches renewal.',omRenewalAlertsEnabled(license.fm)],
- ['Billing_Alerts','Upcoming charges','Notify before a scheduled billing charge.',omBillingAlertsEnabled(license.fm)],
- ...(seatBased?[['Seat_Alerts','Low seat availability','Notify when 5 or fewer purchased seats remain.',omSeatAlertsEnabled(license.fm)]]:[])
- ]){new Setting(alerts).setName(label).setDesc(description).addToggle(t=>t.setValue(enabled).onChange(async value=>{try{await this.app.fileManager.processFrontMatter(license.file,fm=>{fm[field]=value});license.fm[field]=value;this.refresh();new Notice(label+(value?' enabled':' disabled'))}catch(error){new Notice('Unable to update alert: '+error.message)}}))}
- const customize=alerts.createEl('button',{text:'Customize alert timing & colors'});customize.onclick=()=>new OMAlertRulesModal(this.app,this,license).open();
- const billing=body.createDiv({cls:'ops-settings-group'});billing.createEl('h4',{text:'Billing & renewals'});
- const current=omBillingCycle(license.fm),next=iso(license.fm.Next_Billing),renewal=omMonthToMonth(license.fm,license.file)?null:inferredRenewal(license.fm);
- billing.createEl('p',{cls:'ops-settings-facts',text:'Billing: '+(current?.label??'Not set')+' · Next charge: '+(next??'Not set')+' · Renewal: '+(renewal?.date??'Not set')});
- if(charge!==null)billing.createEl('p',{cls:'ops-settings-facts',text:'Expected charge: '+omUSD(charge)+' / '+frequency});
- const schedule=billing.createEl('button',{text:'Edit billing schedule'});schedule.onclick=()=>new OMBillingModal(this.app,this,license).open();const contractDate=billing.createEl('button',{text:renewal?'Edit renewal date':'Set contract renewal date'});contractDate.onclick=()=>new OMContractDateModal(this.app,this,license).open();
- if(seatBased||/nextiva/i.test(license.file.basename)){
- const seats=body.createDiv({cls:'ops-settings-group'});seats.createEl('h4',{text:'Seats & assignments'});
- if(hasTypes||/nextiva/i.test(license.file.basename)){
- if(hasTypes){seats.createEl('p',{cls:'ops-settings-facts',text:multi.length+' license types · '+bought+' purchased · '+used+' assigned · '+available+' available · Calculated subtotal: '+omUSD(summary.total)+' (not recorded Cost)'});for(const t of multi)seats.createEl('p',{cls:'ops-settings-facts',text:t.name+' → '+(t.field||'Nextiva_Licenses')});}
- else seats.createEl('p',{cls:'ops-settings-facts',text:'No license types configured yet. Add each Nextiva license type, its monthly price, and purchased seat count.'});
- const typeBtn=seats.createEl('button',{text:hasTypes?'Manage license types':'Add license types'});typeBtn.onclick=()=>new OMNextivaTypesModal(this.app,this,license).open();
- if(hasTypes){const employeeBtn=seats.createEl('button',{text:'Assign employee licenses'});employeeBtn.onclick=()=>new OMNextivaAssignmentsModal(this.app,this,license).open();}
- }else{
- seats.createEl('p',{cls:'ops-settings-facts',text:(bought===null?'Purchased seats not set':bought+' purchased · '+used+' assigned · '+available+' available')});
- const set=seats.createEl('button',{text:'Set purchased seats'});set.onclick=()=>new OMSeatCountModal(this.app,this,license).open();
- seats.createEl('p',{cls:'ops-settings-facts',text:'Employee property: '+this.licenseField(license)});const fieldButton=seats.createEl('button',{text:'Choose employee property'});fieldButton.onclick=()=>new OMLicenseFieldModal(this.app,this,license).open();const manage=seats.createEl('button',{text:'Manage employees'});manage.onclick=()=>new OMEmployeeLicenseModal(this.app,this,license,inv.employees).open();
- }
- }
- }}
- search.addEventListener('input',show);show();
+function termMonths(fm) {
+  const x = Number(fm.Renewal_Term_Months);
+  return Number.isInteger(x) && x > 0 ? x : null;
 }
 
- renderSeatAvailability(root,records){const seats=records.filter(r=>{const raw=r.fm.Agreement_Types??r.fm.Agreement_Type??r.fm.License_Type??[];const types=(Array.isArray(raw)?raw:String(raw).split(',')).map(v=>String(v).trim().toLowerCase());return omNextivaTypes(r.fm).length>0||types.some(t=>['software seats','seat','software','per-user'].includes(t))||this.licenseInventory(r).total!==null});if(!seats.length)return;root.createEl('h2',{cls:'ops-equipment-heading',text:'License Overview'});const list=root.createDiv({cls:'ops-license-overviews'});for(const r of seats){const types=omNextivaTypes(r.fm);const multi=types.length>0;const inv=this.licenseInventory(r);const breakdown=multi?omNextivaSummary(this,r):null;const purchased=multi?breakdown.rows.reduce((n,x)=>n+x.purchased,0):inv.total;const assigned=multi?breakdown.rows.reduce((n,x)=>n+x.assigned,0):inv.assigned;const available=purchased===null?null:purchased-assigned;const alerts=omSeatAlertsEnabled(r.fm);const severity=alerts&&available!==null?(available<=2?' ops-seat-warning':available>=3&&available<=5?' ops-seat-moderate':''):'';const card=list.createDiv({cls:'ops-license-overview ops-attention-item'+severity});const info=card.createDiv({cls:'ops-item-info'});const title=info.createEl('button',{cls:'ops-item-title',text:r.file.basename});title.onclick=()=>this.app.workspace.getLeaf(false).openFile(r.file);const billing=omBillingCycle(r.fm);const total=omRenewalEstimate(r.fm)?.amount??null;const perSeat=total!==null&&purchased!==null&&purchased>0?total/purchased:null;info.createEl('small',{text:(purchased===null?'Purchased seats unknown':purchased+' purchased · '+assigned+' assigned · '+available+' available')});info.createEl('small',{text:'Billing total: '+(total===null?'Not set':omUSD(total))+' / '+(billing?.label?.toLowerCase()??'billing period')+(perSeat!==null?' · Derived: '+omUSD(perSeat)+' / purchased seat':'')});if(multi){const details=info.createEl('details',{cls:'ops-license-overview-details'});const key='licenses:overview:types:'+r.file.path;details.open=this.settings.collapsedSections?.[key]===true;details.addEventListener('toggle',()=>{if(this.settings.collapsedSections?.[key]===details.open)return;this.settings.collapsedSections={...(this.settings.collapsedSections||{}),[key]:details.open};this.saveData(this.settings)});details.createEl('summary',{text:'License types ('+breakdown.rows.length+')'});const table=details.createEl('table');const header=table.createEl('tr');for(const label of ['Type','Purchased','Assigned','Available','Rate','Monthly total'])header.createEl('th',{text:label});for(const item of breakdown.rows){const tr=table.createEl('tr');for(const val of [item.name,item.purchased,item.assigned,item.available,omUSD(item.rate),omUSD(item.cost)])tr.createEl('td',{text:String(val)});if(item.holders.length){const peopleRow=table.createEl('tr');const peopleCell=peopleRow.createEl('td');peopleCell.colSpan=6;peopleCell.createSpan({text:'Assigned: '});for(const [index,employee] of item.holders.entries()){if(index)peopleCell.createSpan({text:', '});const link=peopleCell.createEl('a',{cls:'internal-link',text:employee.file.basename,href:'#'});link.onclick=e=>{e.preventDefault();this.app.workspace.getLeaf(false).openFile(employee.file)}}}}const assign=info.createEl('button',{text:'Manage type assignments'});assign.onclick=()=>new OMNextivaAssignmentsModal(this.app,this,r).open()}else{const linked=inv.employees.filter(e=>Object.entries(e.fm).some(([key,value])=>key.toLowerCase()===inv.field.toLowerCase()&&omLicenseAssigned(value)));const details=info.createEl('details',{cls:'ops-license-overview-details'});const key='licenses:overview:people:'+r.file.path;details.open=this.settings.collapsedSections?.[key]===true;details.addEventListener('toggle',()=>{if(this.settings.collapsedSections?.[key]===details.open)return;this.settings.collapsedSections={...(this.settings.collapsedSections||{}),[key]:details.open};this.saveData(this.settings)});details.createEl('summary',{text:'Assigned employees ('+linked.length+')'});for(const employee of linked){const link=details.createEl('button',{text:employee.file.basename});link.onclick=()=>this.app.workspace.getLeaf(false).openFile(employee.file)}if(!linked.length)details.createEl('small',{text:'No assigned employees.'});const assign=info.createEl('button',{text:'Manage employee assignments'});assign.onclick=()=>new OMEmployeeLicenseModal(this.app,this,r,inv.employees).open()}}}
- renderEquipmentPhases(root,records,mode='phase'){const dashboard=mode==='phase';const heading=root.createEl(dashboard?'h2':'h3',{text:dashboard?'Equipment by Phase':'Equipment by Status'});heading.addClass('ops-equipment-heading');let sortBy='filename';const controls=root.createDiv({cls:'ops-equipment-controls'});if(!dashboard){new Setting(controls).setName('Sort devices by').addDropdown(d=>d.addOption('filename','Filename').addOption('employee','Employee name').setValue(sortBy).onChange(v=>{sortBy=v;draw()}))}const area=root.createDiv({cls:'ops-equipment-groups'});const employeeName=r=>{const v=r.fm.Employee??r.fm.Assigned_To??'';return Array.isArray(v)?v.map(String).join(', '):String(v)};const populated=v=>v!==undefined&&v!==null&&String(v).trim()!=='';const showValue=v=>Array.isArray(v)?v.map(String).join(', '):typeof v==='object'&&v!==null?JSON.stringify(v):String(v);const draw=()=>{area.empty();const groups=new Map();for(const r of records){const raw=dashboard?(r.fm.Approved??r.fm.approved):(r.fm.Status??r.fm.status);let group=populated(raw)?String(raw).trim():dashboard?'Unassigned phase':'No status';if(dashboard){const match=group.match(/Phase\b.*$/i);if(match)group=match[0]}if(!groups.has(group))groups.set(group,[]);groups.get(group).push(r)}const names=[...groups.keys()].sort((a,b)=>!dashboard&&a.toLowerCase()==='complete'?1:!dashboard&&b.toLowerCase()==='complete'?-1:a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));if(!names.length)area.createEl('p',{text:'No equipment notes found.'});for(const group of names){const items=groups.get(group);const section=area.createEl('details',{cls:'ops-equipment-phase'});const collapseKey=mode+':'+group;section.open=this.settings.collapsedSections?.[collapseKey]===true;section.addEventListener('toggle',()=>{const next=section.open;if(this.settings.collapsedSections?.[collapseKey]===next)return;this.settings.collapsedSections={...(this.settings.collapsedSections||{}),[collapseKey]:next};this.saveData(this.settings)});section.createEl('summary',{text:group+' ('+items.length+')'});const list=section.createDiv({cls:'ops-equipment-list'});const ordered=[...items].sort((a,b)=>(sortBy==='employee'?employeeName(a).localeCompare(employeeName(b),undefined,{numeric:true,sensitivity:'base'})||a.file.basename.localeCompare(b.file.basename,undefined,{numeric:true,sensitivity:'base'}):a.file.basename.localeCompare(b.file.basename,undefined,{numeric:true,sensitivity:'base'})));for(const r of ordered){const card=list.createDiv({cls:'ops-attention-item ops-equipment-card'});this.renderCardIcon(card,'device');const info=card.createDiv({cls:'ops-item-info'});const title=info.createEl('button',{cls:'ops-item-title',text:r.file.basename});title.onclick=()=>this.app.workspace.getLeaf(false).openFile(r.file);const addLinkedText=(parent,value)=>{const parts=showValue(value).split(/(\[\[[^\]]+\]\])/g);for(const part of parts){const match=part.match(/^\[\[([^\]]+)\]\]$/);if(!match){parent.createSpan({text:part});continue}const [target,alias]=match[1].split('|');const label=alias||target;const link=parent.createEl('a',{text:label,cls:'internal-link'});link.href='#';link.onclick=e=>{e.preventDefault();e.stopPropagation();this.app.workspace.openLinkText(target,r.file.path,false)}}};const summary=info.createEl('small');addLinkedText(summary,employeeName(r)||'No employee');summary.createSpan({text:' · '+(populated(r.fm.Ordered)?'Ordered':'Not ordered')+' · '+(populated(r.fm.Set_Up)?'Set up':'Not set up')});const note=r.fm.Notes;if(populated(note)){const line=info.createDiv({cls:'ops-equipment-note'});line.createSpan({text:'Notes: '});addLinkedText(line,note)}const replacing=r.fm.To_Replace;if(populated(replacing)){const line=info.createDiv({cls:'ops-equipment-replace'});line.createSpan({text:'To replace: '});addLinkedText(line,replacing)}const edit=card.createEl('button',{text:'Update',cls:'ops-item-action'});edit.onclick=()=>new OMDeviceWorkflowModal(this.app,this,r).open()}}};draw()}
+function omLinkValue(v) {
+  if (v == null) return "";
+  if (Array.isArray(v)) return omLinkValue(v[0]);
+  if (typeof v === "object") return String(v.path ?? v.link ?? "");
+  return String(v)
+    .replace(/^\\[\\[/,'').replace(/\\]\\]$/, "")
+    .split("|")[0]
+    .trim();
+}
+function omKey(v) {
+  return omLinkValue(v)
+    .replace(/\\\\/g, "/")
+    .replace(/\\.md$/i, "")
+    .toLowerCase();
+}
+function omMatches(ref, file) {
+  const k = omKey(ref);
+  return (
+    !!k &&
+    (k === omKey(file.path) || k === omKey(file.basename) || k === omKey(file.path.split("/").slice(-1)[0]))
+  );
+}
+function omRelated(fm, field) {
+  const v = fm[field];
+  return Array.isArray(v) ? v : v == null ? [] : [v];
+}
+class OMDeviceWorkflowModal extends Modal {
+  constructor(app, plugin, record) {
+    super(app);
+    this.plugin = plugin;
+    this.record = record;
+    const fm = record.fm;
+    this.status = String(fm.Status ?? fm.status ?? "in progress");
+    this.employee = Array.isArray(fm.Employee)
+      ? fm.Employee.map(String).join(", ")
+      : String(fm.Employee ?? fm.Assigned_To ?? "");
+    this.serial = String(fm.Serial_Number ?? fm.Serial ?? "");
+    this.model = String(fm.Device_Model ?? fm.Model ?? "");
+    this.orderDate = iso(fm.Ordered ?? fm.Order_Date) ?? "";
+    this.received = iso(fm.Set_Up ?? fm.Set_up) ?? "";
+    this.oldReturned = !!fm.Old_Device_Returned;
+  }
+  onOpen() {
+    const c = this.contentEl;
+    c.createEl("h2", { text: "Update equipment workflow" });
+    c.createEl("p", { text: this.record.file.basename });
+    const choices = [
+      "in progress",
+      "awaiting approval",
+      "ordered",
+      "shipped",
+      "delivered",
+      "complete",
+      "cancelled",
+    ];
+    const current = this.status;
+    new Setting(c)
+      .setName("Status")
+      .setDesc("Uses the existing Status property; no Order_Status field.")
+      .addDropdown((d) => {
+        for (const option of [...new Set([...choices, current])]) d.addOption(option, option);
+        this.status =
+          this.received && current === "in progress"
+            ? "delivered"
+            : this.orderDate && current === "in progress"
+              ? "ordered"
+              : current;
+        d.setValue(this.status);
+        d.onChange((v) => (this.status = v));
+      });
+    const field = (label, val, set) =>
+      new Setting(c).setName(label).addText((t) => t.setValue(val).onChange(set));
+    field("Employee", this.employee, (v) => (this.employee = v));
+    field("Device model", this.model, (v) => (this.model = v));
+    field("Serial number", this.serial, (v) => (this.serial = v));
+    const dateField = (label, value, save) =>
+      new Setting(c).setName(label).addText((t) => {
+        t.inputEl.type = "date";
+        t.setValue(value);
+        t.onChange(save);
+      });
+    dateField("Ordered", this.orderDate, (v) => (this.orderDate = v));
+    dateField("Set_Up", this.received, (v) => (this.received = v));
+    new Setting(c)
+      .setName("Old device returned")
+      .addToggle((t) => t.setValue(this.oldReturned).onChange((v) => (this.oldReturned = v)));
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Save to original note")
+        .setCta()
+        .onClick(async () => {
+          for (const v of [this.orderDate, this.received])
+            if (v && !iso(v)) {
+              new Notice("Dates must use YYYY-MM-DD");
+              return;
+            }
+          try {
+            await this.app.fileManager.processFrontMatter(this.record.file, (fm) => {
+              fm.Status = this.status;
+              delete fm.Order_Status;
+              if (Object.prototype.hasOwnProperty.call(fm, "Employee"))
+                fm.Employee = Array.isArray(fm.Employee)
+                  ? this.employee
+                      .split(",")
+                      .map((x) => x.trim())
+                      .filter(Boolean)
+                  : this.employee;
+              else fm.Employee = this.employee;
+              fm.Device_Model = this.model;
+              fm.Serial_Number = this.serial;
+              fm.Ordered = this.orderDate;
+              fm.Set_Up = this.received;
+              fm.Old_Device_Returned = this.oldReturned;
+            });
+            new Notice("Equipment workflow updated");
+            this.close();
+            this.plugin.refresh();
+          } catch (e) {
+            new Notice("Could not save: " + e.message);
+          }
+        }),
+    );
+  }
+}
+class OMEmployeeLicenseModal extends Modal {
+  constructor(app, plugin, license, employees) {
+    super(app);
+    this.plugin = plugin;
+    this.license = license;
+    this.employees = employees;
+    this.search = "";
+  }
+  onOpen() {
+    this.render();
+  }
+  render() {
+    const c = this.contentEl;
+    c.empty();
+    const field = this.plugin.licenseField(this.license);
+    c.createEl("h2", { text: "Employee assignments: " + field });
+    new Setting(c).setName("Find employee").addText((t) =>
+      t.setValue(this.search).onChange((v) => {
+        this.search = v;
+        this.render();
+      }),
+    );
+    const matching = this.employees
+      .filter((e) => e.file.basename.toLowerCase().includes(this.search.toLowerCase()))
+      .sort((a, b) =>
+        a.file.basename.localeCompare(b.file.basename, undefined, { sensitivity: "base", numeric: true }),
+      );
+    for (const e of matching) {
+      const active = omLicenseAssigned(e.fm[field]);
+      new Setting(c)
+        .setName(e.file.basename)
+        .setDesc(active ? "Assigned" : "Not assigned")
+        .addButton((b) =>
+          b.setButtonText(active ? "Unassign" : "Assign").onClick(async () => {
+            try {
+              if (!active) {
+                const counts = this.plugin.licenseInventory(this.license);
+                if (counts.total !== null && counts.assigned >= counts.total) {
+                  new Notice("No available seats. Increase purchased seats or unassign an employee first.");
+                  return;
+                }
+              }
+              await this.app.fileManager.processFrontMatter(e.file, (fm) => {
+                fm[field] = active ? false : true;
+              });
+              e.fm[field] = active ? false : true;
+              this.plugin.refresh();
+              this.render();
+            } catch (err) {
+              new Notice("Could not update employee: " + err.message);
+            }
+          }),
+        );
+    }
+    if (!matching.length) c.createEl("p", { text: "No matching employee notes." });
+  }
+}
+class OMAgreementTypesModal extends Modal {
+  constructor(app, plugin, record) {
+    super(app);
+    this.plugin = plugin;
+    this.record = record;
+    const fm = record.fm;
+    const raw = fm.Agreement_Types ?? fm.Agreement_Type ?? fm.License_Type ?? [];
+    this.types = new Set(
+      (Array.isArray(raw) ? raw : String(raw).split(","))
+        .map((v) => String(v).trim().toLowerCase())
+        .filter(Boolean),
+    );
+  }
+  onOpen() {
+    const c = this.contentEl;
+    c.createEl("h2", { text: "Agreement types: " + this.record.file.basename });
+    c.createEl("p", { text: "Choose all that apply." });
+    for (const name of ["Maintenance", "Lease", "Software seats", "Other"]) {
+      const key = name.toLowerCase();
+      new Setting(c).setName(name).addToggle((t) =>
+        t
+          .setValue(
+            this.types.has(key) ||
+              (key === "software seats" &&
+                (this.types.has("seat") || this.types.has("software") || this.types.has("per-user"))),
+          )
+          .onChange((v) => {
+            if (v) this.types.add(key);
+            else {
+              this.types.delete(key);
+              if (key === "software seats") {
+                this.types.delete("seat");
+                this.types.delete("software");
+                this.types.delete("per-user");
+              }
+            }
+          }),
+      );
+    }
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Save agreement types")
+        .setCta()
+        .onClick(async () => {
+          try {
+            const values = [...this.types];
+            await this.app.fileManager.processFrontMatter(this.record.file, (fm) => {
+              fm.Agreement_Types = values;
+            });
+            this.record.fm.Agreement_Types = values;
+            this.close();
+            this.plugin.refresh();
+            new Notice("Agreement types saved");
+          } catch (e) {
+            new Notice("Could not save: " + e.message);
+          }
+        }),
+    );
+  }
+}
+function omNextivaTypes(fm) {
+  const raw = fm.License_Types;
+  return (Array.isArray(raw) ? raw : [])
+    .filter((x) => x && typeof x === "object")
+    .map((x) => ({
+      name: String(x.Name ?? x.name ?? "").trim(),
+      purchased: Number(x.Purchased ?? x.purchased),
+      rate: Number(x.Monthly_Rate ?? x.monthly_rate),
+      field: String(x.Employee_Field ?? x.employee_field ?? "").trim(),
+    }))
+    .filter(
+      (x) =>
+        x.name && Number.isInteger(x.purchased) && x.purchased >= 0 && Number.isFinite(x.rate) && x.rate >= 0,
+    );
+}
+function omEmployeeLicenseValue(fm, type) {
+  if (type.field) {
+    const key = Object.keys(fm).find((k) => k.toLowerCase() === type.field.toLowerCase());
+    return key ? omLicenseAssigned(fm[key]) : false;
+  }
+  const raw = fm.Nextiva_Licenses;
+  return (Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : []).some(
+    (v) => String(v).trim().toLowerCase() === type.name.toLowerCase(),
+  );
+}
+function omNextivaSummary(plugin, license) {
+  const types = omNextivaTypes(license.fm);
+  const people = plugin
+    .employeeNotes()
+    .filter(
+      (e) =>
+        tagSet(e.fm).has("employee") ||
+        e.file.path.split("/").some((p) => /^employees?$/i.test(p)) ||
+        Array.isArray(e.fm.Nextiva_Licenses) ||
+        types.some(
+          (t) => t.field && Object.keys(e.fm).some((k) => k.toLowerCase() === t.field.toLowerCase()),
+        ),
+    );
+  const rows = types.map((t) => {
+    const holders = people.filter((e) => omEmployeeLicenseValue(e.fm, t));
+    const assigned = holders.length;
+    return {
+      ...t,
+      holders,
+      assigned,
+      available: t.purchased - assigned,
+      cost: Math.round(t.purchased * t.rate * 100) / 100,
+    };
+  });
+  return { rows, total: Math.round(rows.reduce((n, x) => n + x.cost, 0) * 100) / 100, people };
+}
+class OMNextivaTypesModal extends Modal {
+  constructor(app, plugin, license) {
+    super(app);
+    this.plugin = plugin;
+    this.license = license;
+    this.rows = omNextivaTypes(license.fm).map((x) => ({ ...x }));
+  }
+  onOpen() {
+    this.render();
+  }
+  render() {
+    const c = this.contentEl;
+    c.empty();
+    c.createEl("h2", { text: "Nextiva license types" });
+    c.createEl("p", {
+      text: "Each price is the monthly rate per purchased license. Charges include unused purchased licenses.",
+    });
+    for (const [i, row] of this.rows.entries()) {
+      const line = c.createDiv({ cls: "ops-project-card" });
+      new Setting(line)
+        .setName("License type")
+        .addText((t) => t.setValue(row.name).onChange((v) => (row.name = v)));
+      new Setting(line)
+        .setName("Purchased seats")
+        .addText((t) => t.setValue(String(row.purchased)).onChange((v) => (row.purchased = v)));
+      new Setting(line)
+        .setName("Monthly price per seat")
+        .addText((t) => t.setValue(String(row.rate)).onChange((v) => (row.rate = v)));
+      new Setting(line)
+        .setName("Employee frontmatter property")
+        .setDesc(
+          "Optional. Match assignments using this existing property on employee notes (true or checked). Leave blank to use Nextiva_Licenses.",
+        )
+        .addText((t) =>
+          t
+            .setPlaceholder("e.g. Nextiva_Voice")
+            .setValue(row.field ?? "")
+            .onChange((v) => (row.field = v)),
+        );
+      new Setting(line).addButton((b) =>
+        b.setButtonText("Remove type").onClick(() => {
+          this.rows.splice(i, 1);
+          this.render();
+        }),
+      );
+    }
+    new Setting(c)
+      .addButton((b) =>
+        b.setButtonText("Add license type").onClick(() => {
+          this.rows.push({ name: "", purchased: 0, rate: 0 });
+          this.render();
+        }),
+      )
+      .addButton((b) =>
+        b
+          .setButtonText("Save license types")
+          .setCta()
+          .onClick(async () => {
+            const rows = this.rows.map((x) => ({
+              Name: String(x.name).trim(),
+              Purchased: Number(x.purchased),
+              Monthly_Rate: Number(x.rate),
+              ...(String(x.field ?? "").trim() ? { Employee_Field: String(x.field).trim() } : {}),
+            }));
+            if (
+              rows.some(
+                (x) =>
+                  !x.Name ||
+                  !Number.isInteger(x.Purchased) ||
+                  x.Purchased < 0 ||
+                  !Number.isFinite(x.Monthly_Rate) ||
+                  x.Monthly_Rate < 0,
+              ) ||
+              new Set(rows.map((x) => x.Name.toLowerCase())).size !== rows.length
+            ) {
+              new Notice("Enter unique names, nonnegative whole seat counts and valid monthly prices");
+              return;
+            }
+            try {
+              await this.app.fileManager.processFrontMatter(this.license.file, (fm) => {
+                fm.License_Types = rows;
+              });
+              this.license.fm.License_Types = rows;
+              this.close();
+              this.plugin.refresh();
+              this.plugin.licenseSettingsTab?.display();
+              new Notice("Nextiva license types saved");
+            } catch (e) {
+              new Notice("Could not save license types: " + e.message);
+            }
+          }),
+      );
+  }
+}
+class OMNextivaAssignmentsModal extends Modal {
+  constructor(app, plugin, license) {
+    super(app);
+    this.plugin = plugin;
+    this.license = license;
+    this.search = "";
+  }
+  onOpen() {
+    this.render();
+  }
+  render() {
+    const c = this.contentEl;
+    c.empty();
+    c.createEl("h2", { text: "Employee license assignments" });
+    c.createEl("p", {
+      text: "Assignments update existing employee-note frontmatter. Purchased seats, not assignments, determine the bill.",
+    });
+    new Setting(c).setName("Find employee").addText((t) =>
+      t.setValue(this.search).onChange((v) => {
+        this.search = v;
+        this.render();
+      }),
+    );
+    const summary = omNextivaSummary(this.plugin, this.license);
+    for (const employee of summary.people
+      .filter((e) => e.file.basename.toLowerCase().includes(this.search.toLowerCase()))
+      .slice(0, 80)) {
+      const details = c.createEl("details");
+      details.createEl("summary", { text: employee.file.basename });
+      const selected = new Set(
+        summary.rows.filter((t) => omEmployeeLicenseValue(employee.fm, t)).map((t) => t.name.toLowerCase()),
+      );
+      for (const type of summary.rows)
+        new Setting(details)
+          .setName(type.name)
+          .setDesc(type.field ? "Property: " + type.field : "Property: Nextiva_Licenses")
+          .addToggle((t) =>
+            t.setValue(selected.has(type.name.toLowerCase())).onChange((v) => {
+              if (v) selected.add(type.name.toLowerCase());
+              else selected.delete(type.name.toLowerCase());
+            }),
+          );
+      new Setting(details).addButton((b) =>
+        b.setButtonText("Save assignments").onClick(async () => {
+          for (const type of summary.rows) {
+            const was = omEmployeeLicenseValue(employee.fm, type),
+              now = selected.has(type.name.toLowerCase());
+            if (!was && now && type.available <= 0) {
+              new Notice("No available " + type.name + " seats. Increase purchased seats first.");
+              return;
+            }
+          }
+          try {
+            await this.app.fileManager.processFrontMatter(employee.file, (fm) => {
+              const current = Array.isArray(fm.Nextiva_Licenses)
+                ? fm.Nextiva_Licenses.map(String)
+                : typeof fm.Nextiva_Licenses === "string"
+                  ? [fm.Nextiva_Licenses]
+                  : [];
+              const unmapped = new Set(current.map((x) => x.toLowerCase()));
+              for (const type of summary.rows) {
+                const enabled = selected.has(type.name.toLowerCase());
+                if (type.field) {
+                  const key =
+                    Object.keys(fm).find((k) => k.toLowerCase() === type.field.toLowerCase()) ?? type.field;
+                  fm[key] = enabled;
+                } else {
+                  if (enabled) unmapped.add(type.name.toLowerCase());
+                  else unmapped.delete(type.name.toLowerCase());
+                }
+              }
+              const previouslyNamed = new Map(current.map((x) => [x.toLowerCase(), x]));
+              fm.Nextiva_Licenses = [...unmapped].map(
+                (x) =>
+                  previouslyNamed.get(x) ?? summary.rows.find((t) => t.name.toLowerCase() === x)?.name ?? x,
+              );
+            });
+            const updated = this.app.metadataCache.getFileCache(employee.file)?.frontmatter;
+            employee.fm = updated ?? employee.fm;
+            this.plugin.refresh();
+            this.render();
+            new Notice("Assignments saved for " + employee.file.basename);
+          } catch (error) {
+            new Notice("Unable to save assignments: " + error.message);
+          }
+        }),
+      );
+    }
+  }
+}
+class OMContractDateModal extends Modal {
+  constructor(app, plugin, license) {
+    super(app);
+    this.plugin = plugin;
+    this.license = license;
+    this.date = iso(license.fm.Next_Renewal) ?? "";
+  }
+  onOpen() {
+    const c = this.contentEl;
+    c.createEl("h2", { text: "Contract renewal: " + this.license.file.basename });
+    c.createEl("p", { text: "This date is independent of your billing schedule." });
+    new Setting(c)
+      .setName("Next contract renewal date")
+      .setDesc("YYYY-MM-DD")
+      .addText((t) =>
+        t
+          .setPlaceholder("2027-08-04")
+          .setValue(this.date)
+          .onChange((value) => (this.date = value.trim())),
+      );
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Save renewal date")
+        .setCta()
+        .onClick(async () => {
+          if (this.date && !iso(this.date)) {
+            new Notice("Enter a valid YYYY-MM-DD date");
+            return;
+          }
+          try {
+            await this.app.fileManager.processFrontMatter(this.license.file, (fm) => {
+              if (this.date) fm.Next_Renewal = this.date;
+              else delete fm.Next_Renewal;
+            });
+            this.license.fm.Next_Renewal = this.date;
+            this.close();
+            this.plugin.refresh();
+            this.plugin.licenseSettingsTab?.display();
+            new Notice("Contract renewal date saved");
+          } catch (error) {
+            new Notice("Could not save renewal date: " + error.message);
+          }
+        }),
+    );
+  }
+}
+class OMAlertRulesModal extends Modal {
+  constructor(app, plugin, license) {
+    super(app);
+    this.plugin = plugin;
+    this.license = license;
+    this.rules = {};
+    for (const kind of ["renewal", "billing", "seats"])
+      this.rules[kind] = omAlertRules(plugin, license.file, kind).map((x) => ({ ...x }));
+  }
+  onOpen() {
+    this.render();
+  }
+  render() {
+    const c = this.contentEl;
+    c.empty();
+    c.createEl("h2", { text: "Alert colors & thresholds: " + this.license.file.basename });
+    c.createEl("p", {
+      cls: "setting-item-description",
+      text: "Customize this license only. The first matching threshold decides the color; No alert hides that event. These settings do not add properties to your notes.",
+    });
+    for (const [kind, title, unit] of [
+      ["renewal", "Contract renewal", "days remaining"],
+      ["billing", "Upcoming charges", "days remaining"],
+      ...(omTracksSeats(this.license.fm) ? [["seats", "Available seats", "seats remaining"]] : []),
+    ]) {
+      const group = c.createDiv({ cls: "ops-alert-rule-group" });
+      group.createEl("h3", { text: title });
+      group.createEl("p", {
+        cls: "setting-item-description",
+        text: "Use ascending thresholds. The last tier sets when alerts begin; choose No alert to suppress a tier.",
+      });
+      for (const [index, row] of this.rules[kind].entries()) {
+        const line = new Setting(group).setName(
+          ["Critical", "Warning", "Early notice"][index] + " (" + unit + ")",
+        );
+        line.addText((t) =>
+          t
+            .setPlaceholder("Threshold")
+            .setValue(String(row.limit))
+            .onChange((v) => (row.limit = v)),
+        );
+        line.addDropdown((d) => {
+          for (const color of OM_ALERT_COLORS)
+            d.addOption(color, color === "none" ? "No alert" : color[0].toUpperCase() + color.slice(1));
+          d.setValue(row.color).onChange((v) => (row.color = v));
+        });
+      }
+    }
+    new Setting(c)
+      .addButton((b) =>
+        b.setButtonText("Restore defaults").onClick(() => {
+          for (const kind of ["renewal", "billing", "seats"])
+            this.rules[kind] = OM_ALERT_DEFAULTS[kind].map((x) => ({ ...x }));
+          this.render();
+        }),
+      )
+      .addButton((b) =>
+        b
+          .setButtonText("Save alert rules")
+          .setCta()
+          .onClick(async () => {
+            for (const kind of ["renewal", "billing", "seats"]) {
+              const rows = this.rules[kind].map((x) => ({ limit: Number(x.limit), color: x.color }));
+              if (
+                rows.some(
+                  (x, i) =>
+                    !Number.isInteger(x.limit) ||
+                    x.limit < 0 ||
+                    x.limit > 3650 ||
+                    !OM_ALERT_COLORS.includes(x.color) ||
+                    (i > 0 && x.limit < rows[i - 1].limit),
+                )
+              ) {
+                new Notice("Use whole-number thresholds in ascending order from 0 to 3650");
+                return;
+              }
+              this.rules[kind] = rows;
+            }
+            try {
+              const key = this.license.file.path;
+              this.plugin.settings.licenseAlertRules = {
+                ...(this.plugin.settings.licenseAlertRules || {}),
+                [key]: this.rules,
+              };
+              await this.plugin.saveData(this.plugin.settings);
+              this.plugin.refresh();
+              this.close();
+              new Notice("Alert rules saved for " + this.license.file.basename);
+            } catch (e) {
+              new Notice("Could not save alert rules: " + e.message);
+            }
+          }),
+      );
+  }
+}
+class OMLicenseFieldModal extends Modal {
+  constructor(app, plugin, license) {
+    super(app);
+    this.plugin = plugin;
+    this.license = license;
+    this.field = String(license.fm.License_Field ?? license.fm.License_Name ?? license.file.basename).trim();
+  }
+  onOpen() {
+    const c = this.contentEl;
+    c.createEl("h2", { text: "Employee field: " + this.license.file.basename });
+    c.createEl("p", {
+      text: "Use an existing property on employee notes to count assigned seats. The value should be true or checked. No employee notes are changed by saving this mapping.",
+    });
+    new Setting(c)
+      .setName("Employee frontmatter property")
+      .addText((t) => t.setValue(this.field).onChange((v) => (this.field = v.trim())));
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Save field mapping")
+        .setCta()
+        .onClick(async () => {
+          if (!this.field) {
+            new Notice("Enter a frontmatter property name");
+            return;
+          }
+          try {
+            await this.app.fileManager.processFrontMatter(this.license.file, (fm) => {
+              fm.License_Field = this.field;
+            });
+            this.license.fm.License_Field = this.field;
+            this.close();
+            this.plugin.refresh();
+            this.plugin.licenseSettingsTab?.display();
+            new Notice("Employee field mapping saved");
+          } catch (error) {
+            new Notice("Could not save mapping: " + error.message);
+          }
+        }),
+    );
+  }
+}
+class OMSeatCountModal extends Modal {
+  constructor(app, plugin, license) {
+    super(app);
+    this.plugin = plugin;
+    this.license = license;
+    this.count = String(license.fm.License_Seats ?? "");
+  }
+  onOpen() {
+    const c = this.contentEl;
+    c.createEl("h2", { text: "Purchased seats: " + this.plugin.licenseField(this.license) });
+    new Setting(c)
+      .setName("Number of seats purchased")
+      .addText((t) => t.setValue(this.count).onChange((v) => (this.count = v)));
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Save")
+        .setCta()
+        .onClick(async () => {
+          const n = Number(this.count);
+          if (!Number.isInteger(n) || n < 0) {
+            new Notice("Enter a nonnegative whole number");
+            return;
+          }
+          try {
+            await this.app.fileManager.processFrontMatter(this.license.file, (fm) => {
+              fm.License_Seats = n;
+            });
+            this.license.fm.License_Seats = n;
+            this.close();
+            this.plugin.refresh();
+            if (this.plugin.licenseSettingsTab) this.plugin.licenseSettingsTab.display();
+            new Notice("Seat count saved");
+          } catch (e) {
+            new Notice(e.message);
+          }
+        }),
+    );
+  }
+}
+class OMProjectModal extends Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+    this.name = "";
+  }
+  onOpen() {
+    const c = this.contentEl;
+    c.createEl("h2", { text: "Create master project" });
+    new Setting(c).setName("Project name").addText((t) => t.onChange((v) => (this.name = v)));
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Create project")
+        .setCta()
+        .onClick(async () => {
+          if (!this.name.trim()) {
+            new Notice("Project name required");
+            return;
+          }
+          const folder = this.plugin.settings.folder;
+          const path = normalizePath(folder + "/" + this.name.trim().replace(/[\\\\/:*?"<>|]/g, "-") + ".md");
+          try {
+            if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+            if (this.app.vault.getAbstractFileByPath(path)) {
+              new Notice("Project already exists");
+              return;
+            }
+            const content =
+              "---\\ntags:\\n  - ops-project\\nStatus: planned\\nProject_Owner: " +
+              JSON.stringify(this.owner) +
+              "\\nTarget_Date: " +
+              JSON.stringify(this.target) +
+              "\\n---\\n# " +
+              this.name +
+              "\\n\\n## Scope\\n\\n## Decisions\\n\\n## Notes\\n";
+            await this.app.vault.create(path, content);
+            new Notice("Project created");
+            this.close();
+            this.plugin.refresh();
+          } catch (e) {
+            new Notice(e.message);
+          }
+        }),
+    );
+  }
+}
+class OMLinkModal extends Modal {
+  constructor(app, plugin, project) {
+    super(app);
+    this.plugin = plugin;
+    this.project = project;
+    this.search = "";
+  }
+  onOpen() {
+    this.render();
+  }
+  render() {
+    const c = this.contentEl;
+    c.empty();
+    c.createEl("h2", { text: "Link records to " + this.project.basename });
+    new Setting(c).setName("Search device, license or order").addText((t) =>
+      t.setValue(this.search).onChange((v) => {
+        this.search = v;
+        this.render();
+      }),
+    );
+    const options = this.plugin
+      .records()
+      .filter(
+        (r) =>
+          r.file.path !== this.project.path &&
+          ["device", "renewal", "order"].includes(r.kind) &&
+          r.file.basename.toLowerCase().includes(this.search.toLowerCase()),
+      )
+      .slice(0, 40);
+    for (const r of options) {
+      const line = new Setting(c).setName(r.file.basename).setDesc(r.kind + " • " + r.file.path);
+      line.addButton((b) =>
+        b.setButtonText(this.plugin.linkedTo(r.fm, this.project) ? "Unlink" : "Link").onClick(async () => {
+          try {
+            await this.app.fileManager.processFrontMatter(r.file, (fm) => {
+              const list = omRelated(fm, "Operations_Projects").map(omLinkValue).filter(Boolean);
+              const linked = list.some((x) => omMatches(x, this.project));
+              fm.Operations_Projects = linked
+                ? list.filter((x) => !omMatches(x, this.project))
+                : [...list, this.project.path];
+              if (!fm.Operations_Projects.length) delete fm.Operations_Projects;
+            });
+            new Notice("Project links updated");
+            this.plugin.refresh();
+            this.render();
+          } catch (e) {
+            new Notice("Could not update: " + e.message);
+          }
+        }),
+      );
+    }
+  }
+}
 
- linkedTo(fm,project){return omRelated(fm,'Operations_Projects').some(x=>omMatches(x,project))}
- renderProjects(root){const projects=this.records().filter(r=>r.kind==='project');const section=root.createDiv({cls:'ops-projects'});section.createEl('h3',{text:'Master projects & linked records'});if(!projects.length)section.createEl('p',{text:'Create a master project, then link existing device, order, and license notes without moving or duplicating them.'});for(const p of projects){const related=this.records().filter(r=>r.file.path!==p.file.path&&this.linkedTo(r.fm,p.file));const card=section.createDiv({cls:'ops-project-card'});const heading=card.createDiv({cls:'ops-project-head'});const open=heading.createEl('button',{text:p.file.basename});open.onclick=()=>this.app.workspace.getLeaf(false).openFile(p.file);heading.createSpan({text:related.length+' linked records'});const add=card.createEl('button',{text:'Manage links'});add.onclick=()=>new OMLinkModal(this.app,this,p.file).open();const list=card.createDiv({cls:'ops-project-links'});for(const r of related){const link=list.createEl('button',{text:r.file.basename+' · '+r.kind});link.onclick=()=>this.app.workspace.getLeaf(false).openFile(r.file)}if(!related.length)list.createEl('small',{text:'No linked devices, licenses, or orders yet.'})}}
- exportNoteTags(file,fm){return tagSet(fm||{})}
- exportTagNames(){const tags=new Set();for(const file of this.app.vault.getMarkdownFiles()){const fm=this.app.metadataCache.getFileCache(file)?.frontmatter||{};for(const tag of this.exportNoteTags(file,fm))tags.add(tag)}return [...tags].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}))}
- exportSourceNotes(selection){if(selection==='tracked')return this.records();const results=[];for(const file of this.app.vault.getMarkdownFiles()){const fm=this.app.metadataCache.getFileCache(file)?.frontmatter||{};if(selection.startsWith('tag:')&&!this.exportNoteTags(file,fm).has(selection.slice(4)))continue;results.push({file,fm,kind:classified(file,fm)||'note'})}return results.sort((a,b)=>a.file.basename.localeCompare(b.file.basename,undefined,{numeric:true,sensitivity:'base'})||a.file.path.localeCompare(b.file.path))}
- exportCellValue(value){if(value===null||value===undefined)return '';if(value instanceof Date)return dateISO(value);if(typeof value==='object')return JSON.stringify(value);return String(value)}
- async exportXLSX(rows,{selection='tracked',allProperties=false}={}){
- let cols,data;
- if(allProperties){
- const keys=new Set();for(const r of rows)for(const key of Object.keys(r.fm||{}))if(key!=='position'&&key!=='---')keys.add(key);
- const sorted=[...keys].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));
- cols=['Name','Note_Path','Tags',...sorted.filter(key=>!['Name','Note_Path','Tags'].includes(key))];
- data=rows.map(r=>{const tags=[...this.exportNoteTags(r.file,r.fm)].map(x=>'#'+x).sort().join(', ');return[r.file.basename,r.file.path,tags,...cols.slice(3).map(key=>this.exportCellValue(r.fm?.[key]))]});
- }else{
- cols=['Type','Name','Status','Order_Status','Approved','Vendor','Employee','Serial_Number','Device_Model','Cost','Ordered','Set_Up','Old_Device_Returned','Next_Renewal','Due_Date','Project','Linked_Projects','Assigned_Licenses','Note_Path'];
- data=rows.map(r=>{const f=r.fm||{};return[r.kind,r.file.basename,f.Status??f.status??'',f.Order_Status,f.Approved,f.Vendor,f.Employee??f.Assigned_To,f.Serial_Number??f.Serial,f.Device_Model??f.Model,f.Cost,f.Ordered??f.Order_Date,f.Set_Up??f.Set_up??f.Received_Date,f.Old_Device_Returned,(inferredRenewal(f)?.date??''),f.Due_Date,f.Project??f.Parent_Project,omRelated(f,'Operations_Projects').map(omLinkValue).join('; '),omRelated(f,'Assigned_Licenses').map(omLinkValue).join('; '),r.file.path]});
- }
- const folder=this.settings.folder;const name=selection==='tracked'?'Operations Records':selection==='all'?'All Vault Notes':'Tag '+selection.slice(4);const safe=name.replace(/[\\/:*?"<>|]/g,'-').slice(0,90);const base=folder+'/'+safe+' '+dateISO(new Date());let path=normalizePath(base+'.xlsx');let i=2;while(this.app.vault.getAbstractFileByPath(path))path=normalizePath(base+' ('+(i++)+').xlsx');
- try{if(!this.app.vault.getAbstractFileByPath(folder))await this.app.vault.createFolder(folder);const bytes=xlsxWorkbook(cols,data);const binary=bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);await this.app.vault.createBinary(path,binary);new Notice('Exported '+rows.length+' notes to '+path);return true}catch(e){new Notice('Excel export failed: '+e.message);return false}
- }
+const OM_ALERT_DEFAULTS = {
+  renewal: [
+    { limit: 30, color: "red" },
+    { limit: 60, color: "orange" },
+    { limit: 90, color: "yellow" },
+  ],
+  billing: [
+    { limit: 30, color: "red" },
+    { limit: 60, color: "orange" },
+    { limit: 90, color: "yellow" },
+  ],
+  seats: [
+    { limit: 2, color: "red" },
+    { limit: 5, color: "orange" },
+    { limit: 10, color: "none" },
+  ],
+};
+const OM_ALERT_COLORS = ["red", "orange", "yellow", "green", "none"];
+function omAlertRules(plugin, file, kind) {
+  const raw = plugin.settings.licenseAlertRules?.[file.path]?.[kind];
+  const defaults = OM_ALERT_DEFAULTS[kind];
+  if (!Array.isArray(raw) || raw.length !== 3) return defaults;
+  const rows = raw.map((v, i) => ({ limit: Number(v?.limit), color: String(v?.color ?? "") }));
+  return rows.every(
+    (v, i) =>
+      Number.isInteger(v.limit) &&
+      v.limit >= 0 &&
+      v.limit <= 3650 &&
+      OM_ALERT_COLORS.includes(v.color) &&
+      (i === 0 || v.limit >= rows[i - 1].limit),
+  )
+    ? rows
+    : defaults;
+}
+function omAlertColor(plugin, file, kind, value) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null;
+  const rules = omAlertRules(plugin, file, kind);
+  for (const rule of rules) if (value <= rule.limit) return rule.color === "none" ? null : rule.color;
+  return null;
+}
+function omAlertDays(plugin, file, kind) {
+  return omAlertRules(plugin, file, kind)[2].limit;
+}
+function omSeatCount(plugin, r) {
+  const types = omNextivaTypes(r.fm);
+  return types.length
+    ? omNextivaSummary(plugin, r).rows.reduce((sum, v) => sum + v.available, 0)
+    : plugin.licenseInventory(r).available;
+}
+function omRenewalAlertsEnabled(fm) {
+  return fm.Renewal_Alerts !== false && String(fm.Renewal_Alerts ?? "").toLowerCase() !== "false";
+}
+function omBillingAlertsEnabled(fm) {
+  return fm.Billing_Alerts !== false && String(fm.Billing_Alerts ?? "").toLowerCase() !== "false";
+}
+function omTracksSeats(fm) {
+  const raw = fm.Agreement_Types ?? fm.Agreement_Type ?? fm.License_Type ?? [];
+  const kinds = (Array.isArray(raw) ? raw : String(raw).split(","))
+    .map((v) => String(v).trim().toLowerCase())
+    .filter(Boolean);
+  if (omNextivaTypes(fm).length > 0) return true;
+  if (kinds.length)
+    return kinds.some((v) =>
+      ["software seats", "software seat", "seat", "seats", "software", "per-user", "per user"].includes(v),
+    );
+  return (
+    fm.License_Seats !== undefined && fm.License_Seats !== null && String(fm.License_Seats).trim() !== ""
+  );
+}
+function omSeatAlertsEnabled(fm) {
+  return fm.Seat_Alerts !== false && String(fm.Seat_Alerts ?? "").toLowerCase() !== "false";
+}
+function omRenewalEstimate(fm) {
+  const raw = fm.Cost;
+  const amount =
+    typeof raw === "number"
+      ? raw
+      : Number(
+          String(raw ?? "")
+            .trim()
+            .replace(/[$,]/g, ""),
+        );
+  if (
+    raw === null ||
+    raw === undefined ||
+    String(raw).trim() === "" ||
+    !Number.isFinite(amount) ||
+    amount < 0
+  )
+    return null;
+  return { amount: Math.round((amount + Number.EPSILON) * 100) / 100 };
+}
+function omBillingCycle(fm) {
+  const value = String(fm.Billing ?? "")
+    .trim()
+    .toLowerCase();
+  const months = {
+    monthly: 1,
+    month: 1,
+    quarterly: 3,
+    quarter: 3,
+    annually: 12,
+    annual: 12,
+    yearly: 12,
+    year: 12,
+    semiannually: 6,
+    "semi-annually": 6,
+    semiannual: 6,
+    biannually: 6,
+    biannual: 6,
+  };
+  return Object.prototype.hasOwnProperty.call(months, value)
+    ? { months: months[value], label: value.charAt(0).toUpperCase() + value.slice(1) }
+    : null;
+}
+function omBillingInfo(fm) {
+  const cycle = omBillingCycle(fm);
+  const date = iso(fm.Next_Billing);
+  if (!cycle || !date) return null;
+  return {
+    date,
+    days: daysUntil(date),
+    months: cycle.months,
+    label: cycle.label,
+    amount: omRenewalEstimate(fm)?.amount ?? null,
+  };
+}
+function omTermCost(fm) {
+  const charge = omRenewalEstimate(fm),
+    cycle = omBillingCycle(fm),
+    term = Number(fm.Renewal);
+  if (!charge || !cycle || !Number.isInteger(term) || term <= 0 || term > 36500) return null;
+  const periods = Math.max(1, Math.round((term * 12) / (365.25 * cycle.months)));
+  return { total: Math.round(charge.amount * periods * 100) / 100, periods };
+}
+function omUSD(n) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+}
+function omDashboardAction(r, plugin) {
+  const fm = r.fm;
+  if (r.equipUp) {
+    const phase = String(fm.Approved ?? fm.approved ?? "Unassigned phase");
+    const ordered = iso(fm.Ordered ?? fm.Order_Date),
+      setup = iso(fm.Set_Up ?? fm.Set_up);
+    const label = !ordered
+      ? "Confirm approval and order equipment"
+      : !setup
+        ? "Follow up on delivery and schedule Set_Up"
+        : "Confirm completion and update Status";
+    return {
+      priority: !ordered ? 20 : !setup ? 40 : 65,
+      date: ordered ?? "",
+      label: label + " · Phase: " + phase,
+      kind: "equipment",
+    };
+  }
+  if (r.kind === "invoice") {
+    const due = iso(fm.Due_Date),
+      created = iso(fm.Date),
+      age = created ? -daysUntil(created) : 0;
+    return {
+      priority: due && daysUntil(due) < 0 ? 5 : age > 7 ? 15 : due && daysUntil(due) <= 7 ? 25 : 50,
+      date: due ?? created ?? "",
+      label:
+        due && daysUntil(due) < 0
+          ? "Check overdue payment · Due " + due
+          : age > 7
+            ? "Follow up on unpaid invoice · Dated " + created
+            : due
+              ? "Check payment · Due " + due
+              : "Check payment · No due date",
+      kind: "invoice",
+    };
+  }
+  if (r.kind === "renewal") {
+    const renewal = omMonthToMonth(fm, r.file) ? null : inferredRenewal(fm);
+    const renewalDays = renewal ? daysUntil(renewal.date) : null;
+    const renewalDue = omRenewalAlertsEnabled(fm) && !!omAlertColor(plugin, r.file, "renewal", renewalDays);
+    const billing = omBillingAlertsEnabled(fm) ? omBillingInfo(fm) : null;
+    const billingDue = billing && !!omAlertColor(plugin, r.file, "billing", billing.days);
+    const urgency = (d) => (d < 0 ? 0 : d <= 14 ? 10 : d <= 30 ? 30 : 45);
+    const preferBilling = billingDue && (!renewalDue || billing.date < renewal.date);
+    const seatDue =
+      omTracksSeats(fm) &&
+      omSeatAlertsEnabled(fm) &&
+      !!omAlertColor(plugin, r.file, "seats", omSeatCount(plugin, r));
+    const label = preferBilling
+      ? "Upcoming charge · " +
+        billing.date +
+        (billing.days < 0
+          ? " · Overdue " + -billing.days + " days"
+          : " · " + billing.days + " days remaining")
+      : renewalDue
+        ? "Renew license or agreement package · " +
+          renewal.date +
+          (renewalDays < 0 ? " · Overdue " + -renewalDays + " days" : " · " + renewalDays + " days remaining")
+        : seatDue
+          ? "Review license availability · " + omSeatCount(plugin, r) + " seats remaining"
+          : "Review license record";
+    return {
+      priority: Math.min(
+        renewalDue ? urgency(renewalDays) : Infinity,
+        billingDue ? urgency(billing.days) : Infinity,
+        55,
+      ),
+      date: preferBilling ? billing.date : renewalDue ? renewal.date : "",
+      label,
+      kind: "renewal",
+    };
+  }
+  return { priority: 70, date: "", label: r.reason || "Follow up", kind: r.kind };
+}
+function omLicenseActiveAlerts(plugin, r) {
+  if (r.kind !== "renewal") return [];
+  const fm = r.fm,
+    alerts = [];
+  const renewal = omMonthToMonth(fm, r.file) ? null : inferredRenewal(fm);
+  if (renewal && omRenewalAlertsEnabled(fm)) {
+    const days = daysUntil(renewal.date),
+      color = omAlertColor(plugin, r.file, "renewal", days);
+    if (color)
+      alerts.push({
+        kind: "renewal",
+        color,
+        date: renewal.date,
+        text:
+          "Contract renewal: " +
+          renewal.date +
+          " · " +
+          (days < 0 ? "Overdue " + -days + " days" : days + " days remaining"),
+      });
+  }
+  const billing = omBillingAlertsEnabled(fm) ? omBillingInfo(fm) : null;
+  if (billing) {
+    const color = omAlertColor(plugin, r.file, "billing", billing.days);
+    if (color)
+      alerts.push({
+        kind: "billing",
+        color,
+        date: billing.date,
+        text:
+          "Upcoming charge: " +
+          billing.date +
+          " · " +
+          (billing.days < 0 ? "Overdue " + -billing.days + " days" : billing.days + " days remaining") +
+          (billing.amount === null ? "" : " · " + omUSD(billing.amount)),
+      });
+  }
+  if (omTracksSeats(fm) && omSeatAlertsEnabled(fm)) {
+    const available = omSeatCount(plugin, r),
+      color = omAlertColor(plugin, r.file, "seats", available);
+    if (color) {
+      const types = omNextivaTypes(fm);
+      const purchased = types.length
+        ? types.reduce((sum, t) => sum + t.purchased, 0)
+        : plugin.licenseInventory(r).total;
+      alerts.push({
+        kind: "seats",
+        color,
+        date: null,
+        text:
+          "Seat availability: " +
+          available +
+          " of " +
+          (purchased === null ? "unknown" : purchased) +
+          " seats available" +
+          (available <= 0 ? " · Review assignments or purchased seats" : ""),
+      });
+    }
+  }
+  return alerts;
+}
+function omDashboardDisplayColor(plugin, r) {
+  if (r.kind === "renewal") {
+    const colors = omLicenseActiveAlerts(plugin, r).map((a) => a.color);
+    return ["red", "orange", "yellow", "green"].find((c) => colors.includes(c)) ?? null;
+  }
+  const due = r.kind === "invoice" ? iso(r.fm.Due_Date) : null;
+  const days = due ? daysUntil(due) : null;
+  const stale = r.kind === "invoice" && r.attention && iso(r.fm.Date) && daysUntil(iso(r.fm.Date)) < -7;
+  return stale || (days !== null && days <= 30) ? "red" : days !== null && days <= 60 ? "orange" : null;
+}
+function omDashboardSortDate(plugin, r) {
+  if (r.kind === "renewal")
+    return (
+      omLicenseActiveAlerts(plugin, r)
+        .filter((a) => a.date)
+        .map((a) => a.date)
+        .sort()[0] ?? "9999-12-31"
+    );
+  return iso(r.fm.Due_Date) ?? iso(r.fm.Date) ?? "9999-12-31";
+}
+class OperationsView extends ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
+  }
+  getViewType() {
+    return VIEW;
+  }
+  getDisplayText() {
+    return "Operations Manager";
+  }
+  getIcon() {
+    return "layout-dashboard";
+  }
+  async onOpen() {
+    await this.render();
+  }
+  renderInvoices(root, records) {
+    let sort = "date";
+    const controls = root.createDiv({ cls: "ops-equipment-controls" });
+    new Setting(controls).setName("Sort invoices by").addDropdown((d) =>
+      d
+        .addOption("date", "Date (newest first)")
+        .addOption("vendor", "Vendor (A-Z)")
+        .setValue(sort)
+        .onChange((v) => {
+          sort = v;
+          draw();
+        }),
+    );
+    const area = root.createDiv({ cls: "ops-invoice-groups" });
+    const draw = () => {
+      area.empty();
+      const ordered = [...records].sort((a, b) =>
+        sort === "vendor"
+          ? String(a.fm.Vendor ?? "").localeCompare(String(b.fm.Vendor ?? ""), undefined, {
+              numeric: true,
+              sensitivity: "base",
+            }) || a.file.basename.localeCompare(b.file.basename)
+          : String(b.fm.Date ?? "").localeCompare(String(a.fm.Date ?? "")) ||
+            a.file.basename.localeCompare(b.file.basename),
+      );
+      for (const [label, paid] of [
+        ["Unpaid", false],
+        ["Paid", true],
+      ]) {
+        const items = ordered.filter(
+          (r) =>
+            (status(r.fm) === "complete" ||
+              status(r.fm) === "paid" ||
+              String(r.fm.Paid_Date ?? "").trim() !== "") === paid,
+        );
+        const key = "invoices:status:" + (paid ? "paid" : "unpaid");
+        const section = area.createEl("details", { cls: "ops-equipment-phase ops-invoice-section" });
+        section.open = this.plugin.settings.collapsedSections?.[key] === true;
+        section.addEventListener("toggle", () => {
+          if (this.plugin.settings.collapsedSections?.[key] === section.open) return;
+          this.plugin.settings.collapsedSections = {
+            ...(this.plugin.settings.collapsedSections || {}),
+            [key]: section.open,
+          };
+          this.plugin.saveData(this.plugin.settings);
+        });
+        section.createEl("summary", { text: label + " (" + items.length + ")" });
+        const list = section.createDiv({ cls: "ops-equipment-list" });
+        if (!items.length) {
+          list.createEl("small", { text: "No " + label.toLowerCase() + " invoices." });
+          continue;
+        }
+        for (const r of items) {
+          const card = list.createDiv({ cls: "ops-attention-item ops-equipment-card" });
+          this.plugin.renderCardIcon(card, "invoice");
+          const info = card.createDiv({ cls: "ops-item-info" });
+          const title = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
+          title.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
+          info.createEl("small", {
+            text: "Date: " + (r.fm.Date ?? "Not set") + " · Vendor: " + (r.fm.Vendor ?? "Not set"),
+          });
+          info.createEl("small", { text: r.reason || "" });
+          if (r.fm.Notes !== undefined && r.fm.Notes !== null && String(r.fm.Notes).trim()) {
+            const notes = info.createDiv({ cls: "ops-equipment-note" });
+            notes.createSpan({ text: "Services: " });
+            omCardLinkedText(notes, r.fm.Notes, this.app, r.file.path);
+          }
+          if (!paid) {
+            const btn = card.createEl("button", { cls: "ops-item-action", text: "Mark paid" });
+            btn.onclick = () => new PaidModal(this.app, this.plugin, r.file).open();
+          }
+        }
+      }
+    };
+    draw();
+  }
 
- async activate(){let leaf=this.app.workspace.getLeavesOfType(VIEW)[0];if(!leaf){leaf=this.app.workspace.getRightLeaf(false);await leaf.setViewState({type:VIEW,active:true})}this.app.workspace.revealLeaf(leaf)}
- refresh(){for(const embedded of this.embeddedDashboards){Promise.resolve(embedded.render()).catch(err=>console.error('Operations Manager embedded dashboard refresh failed',err))}for(const leaf of this.app.workspace.getLeavesOfType(VIEW)){const view=leaf.view;const el=view.contentEl;const scroll=el.querySelector('.view-content')||el;const position=scroll.scrollTop;Promise.resolve(view.render()).then(()=>{scroll.scrollTop=position})}}
+  renderLicenseOverviewInline(info, r) {
+    const plugin = this.plugin;
+    const types = omNextivaTypes(r.fm);
+    const multi = types.length > 0;
+    const inv = plugin.licenseInventory(r);
+    const data = multi ? omNextivaSummary(plugin, r) : null;
+    const purchased = multi ? data.rows.reduce((n, x) => n + x.purchased, 0) : inv.total;
+    const assigned = multi ? data.rows.reduce((n, x) => n + x.assigned, 0) : inv.assigned;
+    const available = purchased === null ? null : purchased - assigned;
+    const amount = omRenewalEstimate(r.fm)?.amount ?? null;
+    const period = omBillingCycle(r.fm)?.label?.toLowerCase() ?? "billing cycle";
+    const seatBased = omTracksSeats(r.fm);
+    const line = seatBased
+      ? purchased === null
+        ? "Purchased seats not set"
+        : purchased + " purchased · " + assigned + " assigned · " + available + " available"
+      : "";
+    const costLine = amount === null ? "" : omUSD(amount) + " / " + period;
+    if (line || costLine)
+      info.createEl("small", {
+        cls: "ops-license-summary",
+        text: [line, costLine].filter(Boolean).join(" · "),
+      });
+    if (!seatBased && !/nextiva/i.test(r.file.basename)) return;
+    const key = "licenses:inline:" + r.file.path;
+    const details = info.createEl("details", { cls: "ops-license-inline-details" });
+    details.open = plugin.settings.collapsedSections?.[key] === true;
+    details.addEventListener("toggle", () => {
+      if (plugin.settings.collapsedSections?.[key] === details.open) return;
+      plugin.settings.collapsedSections = {
+        ...(plugin.settings.collapsedSections || {}),
+        [key]: details.open,
+      };
+      plugin.saveData(plugin.settings);
+    });
+    details.createEl("summary", { text: "License details" });
+    const content = details.createDiv({ cls: "ops-license-inline-body" });
+    if (/nextiva/i.test(r.file.basename) && !multi) {
+      content.createEl("p", { text: "No Nextiva license types configured yet." });
+      const add = content.createEl("button", { text: "Add license types" });
+      add.onclick = () => new OMNextivaTypesModal(this.app, plugin, r).open();
+    }
+    if (multi) {
+      content.createEl("p", {
+        text:
+          "Calculated license-type subtotal: " +
+          omUSD(data.total) +
+          " (comparison only; billed amount comes from Cost).",
+      });
+      const table = content.createEl("table");
+      const header = table.createEl("tr");
+      for (const title of ["Type", "Purchased", "Assigned", "Available", "Rate", "Calculated subtotal"])
+        header.createEl("th", { text: title });
+      for (const type of data.rows) {
+        const tr = table.createEl("tr");
+        for (const value of [
+          type.name,
+          type.purchased,
+          type.assigned,
+          type.available,
+          omUSD(type.rate),
+          omUSD(type.cost),
+        ])
+          tr.createEl("td", { text: String(value) });
+        const people = content.createDiv({ cls: "ops-license-assignees" });
+        people.createSpan({ text: type.name + ": " });
+        if (!type.holders.length) people.createSpan({ text: "No employees assigned" });
+        for (const [i, employee] of type.holders.entries()) {
+          if (i) people.createSpan({ text: ", " });
+          const link = people.createEl("button", { text: employee.file.basename });
+          link.onclick = () => this.app.workspace.getLeaf(false).openFile(employee.file);
+        }
+      }
+      const edit = content.createEl("button", { text: "Manage license types" });
+      edit.onclick = () => new OMNextivaTypesModal(this.app, plugin, r).open();
+      const assign = content.createEl("button", { text: "Manage assignments" });
+      assign.onclick = () => new OMNextivaAssignmentsModal(this.app, plugin, r).open();
+    } else if (seatBased) {
+      if (amount !== null && purchased !== null && purchased > 0)
+        content.createEl("p", {
+          text: "Derived average per purchased seat: " + omUSD(amount / purchased) + " / " + period,
+        });
+      const employees = inv.employees.filter((e) =>
+        Object.entries(e.fm).some(
+          ([field, value]) => field.toLowerCase() === inv.field.toLowerCase() && omLicenseAssigned(value),
+        ),
+      );
+      content.createEl("p", { text: "Assigned employees: " + employees.length });
+      for (const employee of employees) {
+        const button = content.createEl("button", { text: employee.file.basename });
+        button.onclick = () => this.app.workspace.getLeaf(false).openFile(employee.file);
+      }
+      const assign = content.createEl("button", { text: "Manage assignments" });
+      assign.onclick = () => new OMEmployeeLicenseModal(this.app, plugin, r, inv.employees).open();
+    }
+  }
+
+  renderOrders(root, records) {
+    root.createEl("h2", { cls: "ops-equipment-heading", text: "Orders by Status" });
+    const groups = new Map();
+    for (const r of records) {
+      const raw = String(r.fm.Status ?? r.fm.status ?? "").trim();
+      const name = raw || (r.fm.Ordered ? "ordered" : "not ordered");
+      const label = name.toLowerCase() === "in progress" && !r.fm.Ordered ? "not ordered" : name;
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label).push(r);
+    }
+    const rank = (name) => {
+      const value = name.trim().toLowerCase();
+      return value === "not ordered"
+        ? 0
+        : value === "in progress"
+          ? 1
+          : value === "ordered"
+            ? 2
+            : value === "complete"
+              ? 3
+              : 4;
+    };
+    const names = [...groups.keys()].sort(
+      (a, b) => rank(a) - rank(b) || a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+    );
+    if (!names.length) root.createEl("p", { text: "No orders found." });
+    for (const name of names) {
+      const items = groups
+        .get(name)
+        .sort((a, b) =>
+          a.file.basename.localeCompare(b.file.basename, undefined, { numeric: true, sensitivity: "base" }),
+        );
+      const key = "orders:status:" + name.toLowerCase();
+      const details = root.createEl("details", { cls: "ops-equipment-phase" });
+      details.open = this.plugin.settings.collapsedSections?.[key] === true;
+      details.addEventListener("toggle", () => {
+        if (this.plugin.settings.collapsedSections?.[key] === details.open) return;
+        this.plugin.settings.collapsedSections = {
+          ...(this.plugin.settings.collapsedSections || {}),
+          [key]: details.open,
+        };
+        this.plugin.saveData(this.plugin.settings);
+      });
+      details.createEl("summary", {
+        text: name.charAt(0).toUpperCase() + name.slice(1) + " (" + items.length + ")",
+      });
+      const list = details.createDiv({ cls: "ops-equipment-list" });
+      for (const r of items) {
+        const card = list.createDiv({ cls: "ops-attention-item ops-equipment-card" });
+        this.plugin.renderCardIcon(card, "order");
+        const info = card.createDiv({ cls: "ops-item-info" });
+        const title = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
+        title.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
+        const emp = r.fm.Employee ?? r.fm.Assigned_To;
+        if (emp) {
+          const line = info.createEl("small");
+          omCardLinkedText(line, emp, this.app, r.file.path);
+        }
+        const approval = r.fm.Approved;
+        if (approval !== undefined && approval !== null && String(approval).trim()) {
+          const line = info.createDiv({ cls: "ops-equipment-note" });
+          line.createSpan({ text: "Approved: " });
+          omCardLinkedText(line, approval, this.app, r.file.path);
+        }
+        const notes = r.fm.Notes;
+        if (notes !== undefined && notes !== null && String(notes).trim()) {
+          const line = info.createDiv({ cls: "ops-equipment-note" });
+          line.createSpan({ text: "Notes: " });
+          omCardLinkedText(line, notes, this.app, r.file.path);
+        }
+        if (tagSet(r.fm).has("equip_ug") || tagSet(r.fm).has("equip_upgrade")) {
+          const update = card.createEl("button", { cls: "ops-item-action", text: "Update" });
+          update.onclick = () => new OMDeviceWorkflowModal(this.app, this.plugin, r).open();
+        }
+      }
+    }
+  }
+
+  async render() {
+    const root = this.contentEl;
+    const scroll = root.querySelector(".view-content") || root;
+    const previousScroll = scroll.scrollTop;
+    root.empty();
+    root.addClass("ops-command");
+    const rows = this.plugin.records();
+    const nav = root.createDiv({ cls: "ops-header" });
+    const title = nav.createDiv();
+    title.createEl("h2", { text: "Operations Command Center" });
+    title.createEl("small", { text: "Your operations at a glance" });
+    const actions = nav.createDiv({ cls: "ops-actions" });
+    for (const [name, fn] of [
+      ["Refresh", () => this.render()],
+      ["New invoice", () => new RecordModal(this.app, this.plugin, "invoice").open()],
+      ["New renewal", () => new RecordModal(this.app, this.plugin, "renewal").open()],
+      ["New order", () => new RecordModal(this.app, this.plugin, "order").open()],
+      ["Export Excel (.xlsx)", () => new OMExportExcelModal(this.app, this.plugin).open()],
+    ]) {
+      const btn = actions.createEl("button", { text: name });
+      btn.onclick = fn;
+    }
+    const tabs = root.createDiv({ cls: "ops-tabs" });
+    const pages = [
+      ["Dashboard", "dashboard"],
+      ["Equipment", "device"],
+      ["Licenses & Renewals", "renewal"],
+      ["Invoices", "invoice"],
+      ["Orders", "order"],
+    ];
+    this.page = this.page || "dashboard";
+    for (const [label, key] of pages) {
+      const t = tabs.createEl("button", {
+        text: label,
+        cls: key === this.page ? "ops-tab active" : "ops-tab",
+      });
+      t.onclick = () => {
+        this.page = key;
+        this.render();
+      };
+    }
+    const due = rows.filter((r) => r.kind === "renewal" && r.attention).length;
+    const orders = rows.filter((r) => r.kind === "order" && !r.done).length;
+    const invoices = rows.filter((r) => r.kind === "invoice" && !r.done).length;
+    const stats = root.createDiv({ cls: "ops-stats" });
+    for (const [num, label, key] of [
+      [due, "Renewals / charges due", "renewal"],
+      [orders, "Open orders", "order"],
+      [invoices, "Unpaid invoices", "invoice"],
+    ]) {
+      const stat = stats.createDiv({ cls: "ops-stat" });
+      const statIcon = stat.createSpan({ cls: "ops-stat-icon" });
+      const iconName = this.plugin.cardIcon(key);
+      if (iconName !== "none") require("obsidian").setIcon(statIcon, iconName);
+      stat.createEl("strong", { text: String(num) });
+      stat.createEl("small", { text: label });
+      stat.onclick = () => {
+        this.page = key;
+        this.render();
+      };
+    }
+    const selected =
+      this.page === "dashboard"
+        ? rows
+            .filter(
+              (r) =>
+                r.kind !== "project" &&
+                r.attention &&
+                !omTerminated(r.fm) &&
+                ((r.kind !== "order" && r.kind !== "device") || r.equipUp),
+            )
+            .sort((a, b) => {
+              const x = omDashboardAction(a, this.plugin),
+                y = omDashboardAction(b, this.plugin);
+              return (
+                x.priority - y.priority ||
+                (x.date || "9999").localeCompare(y.date || "9999") ||
+                a.file.basename.localeCompare(b.file.basename)
+              );
+            })
+        : rows.filter(
+            (r) =>
+              !omTerminated(r.fm) &&
+              (this.page === "order"
+                ? r.kind === "order"
+                : this.page === "device"
+                  ? (r.kind === "device" || r.kind === "order") &&
+                    (tagSet(r.fm).has("equip_ug") ||
+                      tagSet(r.fm).has("equip_upgrade") ||
+                      tagSet(r.fm).has("device"))
+                  : r.kind === this.page),
+          );
+    if (this.page === "invoice") {
+      this.renderInvoices(root, selected);
+      return;
+    }
+    if (this.page === "order") {
+      this.renderOrders(root, selected);
+      return;
+    }
+    if (this.page === "device") {
+      this.plugin.renderEquipmentPhases(
+        root,
+        selected.filter((r) => r.kind !== "invoice"),
+        "status",
+      );
+      return;
+    }
+    if (this.page === "renewal") {
+      const sort = this.licenseSort || "filename";
+      new Setting(root.createDiv({ cls: "ops-equipment-controls" }))
+        .setName("Sort licenses by")
+        .addDropdown((d) =>
+          d
+            .addOption("filename", "Filename (A-Z)")
+            .addOption("seats", "Seats left (fewest first)")
+            .addOption("renewal", "Next renewal date (soonest first)")
+            .setValue(sort)
+            .onChange((v) => {
+              this.licenseSort = v;
+              this.render();
+            }),
+        );
+      const compareName = (a, b) =>
+        a.file.basename.localeCompare(b.file.basename, undefined, { numeric: true, sensitivity: "base" });
+      selected.sort((a, b) => {
+        if (sort === "seats") {
+          const av = this.plugin.licenseInventory(a).available,
+            bv = this.plugin.licenseInventory(b).available;
+          return (av === null ? Infinity : av) - (bv === null ? Infinity : bv) || compareName(a, b);
+        }
+        if (sort === "renewal") {
+          const ad = omMonthToMonth(a.fm, a.file) ? null : inferredRenewal(a.fm)?.date,
+            bd = omMonthToMonth(b.fm, b.file) ? null : inferredRenewal(b.fm)?.date;
+          return (ad || "9999-12-31").localeCompare(bd || "9999-12-31") || compareName(a, b);
+        }
+        return compareName(a, b);
+      });
+    }
+    if (this.page === "renewal")
+      root.createEl("h2", { cls: "ops-equipment-heading", text: "Licenses & Renewals" });
+    else if (this.page !== "dashboard")
+      root.createEl("h3", { text: pages.find((p) => p[1] === this.page)?.[0] || "Records" });
+    const list = root.createDiv({ cls: "ops-attention" });
+    const actionRows = this.page === "dashboard" ? selected.filter((r) => !r.equipUp) : selected;
+    const dashboard = this.page === "dashboard";
+    const seatAlerts = dashboard
+      ? rows.filter(
+          (r) =>
+            r.kind === "renewal" &&
+            omTracksSeats(r.fm) &&
+            omSeatAlertsEnabled(r.fm) &&
+            !!omAlertColor(this.plugin, r.file, "seats", omSeatCount(this.plugin, r)),
+        )
+      : [];
+    const grouped = new Map();
+    for (const r of actionRows) {
+      grouped.set(r.file.path, { r, seat: null });
+    }
+    for (const r of seatAlerts) {
+      const inv = this.plugin.licenseInventory(r);
+      const types = omNextivaTypes(r.fm);
+      const seat = types.length
+        ? {
+            ...inv,
+            available: omSeatCount(this.plugin, r),
+            assigned: omNextivaSummary(this.plugin, r).rows.reduce((sum, x) => sum + x.assigned, 0),
+            total: types.reduce((sum, x) => sum + x.purchased, 0),
+          }
+        : inv;
+      if (grouped.has(r.file.path)) grouped.get(r.file.path).seat = seat;
+      else grouped.set(r.file.path, { r, seat });
+    }
+    const entries = [...grouped.values()].filter(
+      (e) =>
+        !dashboard ||
+        (!["follow up", "follow-up"].includes(status(e.r.fm)) &&
+          !tagSet(e.r.fm).has("follow_up") &&
+          !tagSet(e.r.fm).has("follow-up")),
+    );
+    if (dashboard)
+      entries.sort((a, b) => {
+        const order = { red: 0, orange: 1, yellow: 2, green: 3 };
+        const ac = omDashboardDisplayColor(this.plugin, a.r),
+          bc = omDashboardDisplayColor(this.plugin, b.r);
+        const rankA = ac === null ? 4 : order[ac],
+          rankB = bc === null ? 4 : order[bc];
+        return (
+          rankA - rankB ||
+          omDashboardSortDate(this.plugin, a.r).localeCompare(omDashboardSortDate(this.plugin, b.r)) ||
+          a.r.file.basename.localeCompare(b.r.file.basename, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          })
+        );
+      });
+    if (
+      !entries.length &&
+      !(
+        dashboard &&
+        this.app.vault.getMarkdownFiles().some((file) => {
+          const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+          return (
+            fm &&
+            !tagSet(fm).has("archive") &&
+            !tagSet(fm).has("meeting_notes") &&
+            !tagSet(fm).has("call_notes") &&
+            (["follow up", "follow-up"].includes(status(fm)) ||
+              tagSet(fm).has("follow_up") ||
+              tagSet(fm).has("follow-up"))
+          );
+        })
+      ) &&
+      !(
+        dashboard &&
+        this.app.vault.getMarkdownFiles().some((file) => {
+          const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+          return (
+            fm &&
+            !tagSet(fm).has("archive") &&
+            !tagSet(fm).has("meeting_notes") &&
+            !tagSet(fm).has("call_notes") &&
+            tagSet(fm).has("equip_ug") &&
+            status(fm) !== "complete"
+          );
+        })
+      )
+    )
+      list.createEl("p", { text: "Nothing currently needs follow-up." });
+    for (const { r, seat } of entries) {
+      const color = dashboard ? omDashboardDisplayColor(this.plugin, r) : null;
+      const item = list.createDiv({ cls: "ops-attention-item" + (color ? " ops-alert-" + color : "") });
+      const icon = this.plugin.renderCardIcon(item, r.kind);
+      const info = item.createDiv({ cls: "ops-item-info" });
+      const name = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
+      name.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
+      if (
+        dashboard &&
+        r.kind !== "renewal" &&
+        r.kind !== "invoice" &&
+        (r.kind === "device" ||
+          tagSet(r.fm).has("device") ||
+          tagSet(r.fm).has("equip_ug") ||
+          tagSet(r.fm).has("equip_upgrade"))
+      )
+        omDashboardDeviceDetails(info, r, this.app, false);
+      else if (dashboard && r.kind === "renewal") {
+        const active = omLicenseActiveAlerts(this.plugin, r);
+        if (active.length) {
+          for (const alert of active)
+            info.createEl("small", {
+              cls: "ops-active-alert ops-active-alert-" + alert.color,
+              text: alert.text,
+            });
+        } else if (
+          r.attention &&
+          omRenewalAlertsEnabled(r.fm) &&
+          !omMonthToMonth(r.fm, r.file) &&
+          !inferredRenewal(r.fm)
+        )
+          info.createEl("small", { text: "Action needed: Set contract renewal date" });
+      } else if (!dashboard || r.attention)
+        info.createEl("small", {
+          text: dashboard ? omDashboardAction(r, this.plugin).label : r.reason || r.kind,
+        });
+      if (this.page === "renewal" && r.kind === "renewal") {
+        try {
+          this.renderLicenseOverviewInline(info, r);
+        } catch (error) {
+          console.error("Operations Manager: license details failed for " + r.file.path, error);
+          info.createEl("small", {
+            text: "Could not display license details: " + (error?.message || String(error)),
+          });
+        }
+      }
+      if (!dashboard)
+        item.createSpan({
+          cls: "ops-item-status",
+          text: r.attention ? "Action needed" : r.done ? "Complete" : "Tracked",
+        });
+      if (
+        dashboard &&
+        r.kind === "renewal" &&
+        omBillingAlertsEnabled(r.fm) &&
+        omBillingInfo(r.fm) &&
+        !!omAlertColor(this.plugin, r.file, "billing", omBillingInfo(r.fm).days)
+      ) {
+        const charge = item.createEl("button", { cls: "ops-item-action", text: "Record charge" });
+        charge.onclick = () => new OMRecordChargeModal(this.app, this.plugin, r).open();
+      }
+      if (
+        r.kind === "renewal" &&
+        omRenewalAlertsEnabled(r.fm) &&
+        inferredRenewal(r.fm) &&
+        !omMonthToMonth(r.fm, r.file) &&
+        !!omAlertColor(this.plugin, r.file, "renewal", daysUntil(inferredRenewal(r.fm).date))
+      ) {
+        const btn = item.createEl("button", { cls: "ops-item-action", text: "Renew" });
+        btn.onclick = () => new RenewModal(this.app, this.plugin, r.file, r.fm).open();
+      }
+      if (
+        dashboard &&
+        (r.kind === "device" ||
+          tagSet(r.fm).has("device") ||
+          tagSet(r.fm).has("equip_ug") ||
+          tagSet(r.fm).has("equip_upgrade"))
+      ) {
+        const btn = item.createEl("button", { cls: "ops-item-action", text: "Update" });
+        btn.onclick = () => new OMDeviceWorkflowModal(this.app, this.plugin, r).open();
+      }
+      if (r.kind === "invoice" && r.attention) {
+        const btn = item.createEl("button", { cls: "ops-item-action", text: "Mark paid" });
+        btn.onclick = () => new PaidModal(this.app, this.plugin, r.file).open();
+      }
+    }
+    if (this.page === "dashboard") {
+      const existing = new Set(entries.map((e) => e.r.file.path));
+      const followups = this.app.vault
+        .getMarkdownFiles()
+        .filter(
+          (file) =>
+            !file.path
+              .split("/")
+              .slice(0, -1)
+              .some((p) => p.toLowerCase() === "templates"),
+        )
+        .map((file) => ({ file, fm: this.app.metadataCache.getFileCache(file)?.frontmatter }))
+        .filter(
+          (x) =>
+            x.fm &&
+            !omTerminated(x.fm) &&
+            !["archive", "archived"].includes(status(x.fm)) &&
+            !["archive", "meeting_notes", "call_notes"].some((t) => tagSet(x.fm).has(t)) &&
+            (status(x.fm) === "follow up" ||
+              status(x.fm) === "follow-up" ||
+              tagSet(x.fm).has("follow_up") ||
+              tagSet(x.fm).has("follow-up")) &&
+            !existing.has(x.file.path),
+        )
+        .sort((a, b) =>
+          a.file.basename.localeCompare(b.file.basename, undefined, { numeric: true, sensitivity: "base" }),
+        );
+      for (const r of followups) {
+        const card = list.createDiv({ cls: "ops-attention-item" });
+        this.plugin.renderCardIcon(card, "followup");
+        const info = card.createDiv({ cls: "ops-item-info" });
+        const btn = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
+        btn.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
+        omDashboardDeviceDetails(info, r, this.app, true);
+        if (tagSet(r.fm).has("device") || tagSet(r.fm).has("equip_ug") || tagSet(r.fm).has("equip_upgrade")) {
+          const update = card.createEl("button", { text: "Update", cls: "ops-item-action" });
+          update.onclick = () =>
+            new OMDeviceWorkflowModal(this.app, this.plugin, { ...r, kind: "device" }).open();
+        }
+      }
+    }
+    if (this.page === "dashboard") {
+      const upgrades = this.app.vault
+        .getMarkdownFiles()
+        .filter(
+          (file) =>
+            !file.path
+              .split("/")
+              .slice(0, -1)
+              .some((part) => part.toLowerCase() === "templates"),
+        )
+        .map((file) => ({ file, fm: this.app.metadataCache.getFileCache(file)?.frontmatter }))
+        .filter(
+          (x) =>
+            x.fm &&
+            !tagSet(x.fm).has("archive") &&
+            !tagSet(x.fm).has("meeting_notes") &&
+            !tagSet(x.fm).has("call_notes") &&
+            tagSet(x.fm).has("equip_ug") &&
+            status(x.fm) !== "complete",
+        )
+        .map((x) => ({ ...x, kind: "order", equipUp: true, attention: true }));
+      if (upgrades.length) this.plugin.renderEquipmentPhases(root, upgrades);
+    }
+    root.createEl("p", {
+      cls: "ops-footnote",
+      text: "Data from your existing Markdown notes. Export creates a formatted Excel workbook. No source notes are modified by browsing or exporting.",
+    });
+    scroll.scrollTop = previousScroll;
+  }
+}
+class OMExportExcelModal extends Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+    this.selection = "tracked";
+    this.allProperties = false;
+  }
+  onOpen() {
+    this.render();
+  }
+  render() {
+    const c = this.contentEl;
+    c.empty();
+    c.createEl("h2", { text: "Export to Excel" });
+    c.createEl("p", {
+      cls: "setting-item-description",
+      text: "Choose which notes to export. Tag exports match YAML frontmatter tags only, even for notes outside the Operations Manager tabs. Inline tags in the note body are ignored.",
+    });
+    const tags = this.plugin.exportTagNames();
+    new Setting(c)
+      .setName("What to export")
+      .setDesc("Filter only by YAML frontmatter tags, such as #device, #license and #person.")
+      .addDropdown((d) => {
+        d.addOption("tracked", "Operations Manager records (current export)");
+        d.addOption("all", "All Markdown notes");
+        for (const tag of tags) d.addOption("tag:" + tag, "#" + tag);
+        d.setValue(this.selection).onChange((value) => {
+          this.selection = value;
+          this.allProperties = value !== "tracked";
+          this.render();
+        });
+      });
+    new Setting(c)
+      .setName("Include every frontmatter property")
+      .setDesc(
+        "Creates a column for each property found across the selected notes, including custom fields. Nested values are kept as readable text.",
+      )
+      .addToggle((t) =>
+        t.setValue(this.allProperties).onChange((value) => {
+          this.allProperties = value;
+          this.updateCount();
+        }),
+      );
+    this.countEl = c.createEl("p", { cls: "ops-footnote" });
+    this.updateCount();
+    new Setting(c)
+      .addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()))
+      .addButton((b) =>
+        b
+          .setButtonText("Export .xlsx")
+          .setCta()
+          .onClick(async () => {
+            const notes = this.plugin.exportSourceNotes(this.selection);
+            if (!notes.length) {
+              new Notice("No matching notes to export");
+              return;
+            }
+            if (
+              await this.plugin.exportXLSX(notes, {
+                selection: this.selection,
+                allProperties: this.allProperties,
+              })
+            )
+              this.close();
+          }),
+      );
+  }
+  updateCount() {
+    if (!this.countEl) return;
+    const notes = this.plugin.exportSourceNotes(this.selection);
+    const props = new Set();
+    if (this.allProperties)
+      for (const note of notes)
+        for (const key of Object.keys(note.fm || {})) if (key !== "position") props.add(key);
+    this.countEl.setText(
+      notes.length +
+        " notes selected" +
+        (this.allProperties
+          ? " · " + props.size + " frontmatter properties found"
+          : " · standard Operations Manager columns"),
+    );
+  }
+}
+class RecordModal extends Modal {
+  constructor(app, plugin, kind) {
+    super(app);
+    this.plugin = plugin;
+    this.kind = kind;
+    this.fields = {};
+  }
+  onOpen() {
+    const c = this.contentEl;
+    c.empty();
+    c.createEl("h2", { text: "New " + this.kind });
+    const specs = {
+      invoice: [
+        ["Vendor", "Vendor"],
+        ["Amount", "Cost"],
+        ["Due date (YYYY-MM-DD)", "Due_Date"],
+        ["Service period start", "Service_Start"],
+        ["Service period end", "Service_End"],
+        ["Services covered / notes", "Notes"],
+      ],
+      renewal: [
+        ["Vendor", "Vendor"],
+        ["Original contract date", "Contract_Date"],
+        ["Next renewal (YYYY-MM-DD)", "Next_Renewal"],
+        ["Term in months", "Renewal_Term_Months"],
+        ["Cost", "Cost"],
+      ],
+      order: [
+        ["Vendor", "Vendor"],
+        ["Approved by / date / phase", "Approved"],
+        ["Ordered date", "Ordered"],
+        ["Assigned employee", "Employee"],
+        ["Replaces (wiki-link)", "To_Replace"],
+      ],
+    };
+    new Setting(c).setName("Note title").addText((t) => t.onChange((v) => (this.title = v)));
+    for (const [label, key] of specs[this.kind])
+      new Setting(c).setName(label).addText((t) => t.onChange((v) => (this.fields[key] = v)));
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Create note")
+        .setCta()
+        .onClick(async () => {
+          if (!this.title?.trim()) {
+            new Notice("Enter a note title");
+            return;
+          }
+          const folder = this.plugin.settings.folder;
+          const path = normalizePath(folder + "/" + this.title.trim().replace(/[\\/:*?"<>|]/g, "-") + ".md");
+          if (this.app.vault.getAbstractFileByPath(path)) {
+            new Notice("A note with that name already exists");
+            return;
+          }
+          try {
+            if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+            const fm = {
+              tags: [this.kind === "renewal" ? "license" : this.kind],
+              Status: this.kind === "invoice" ? "unpaid" : "to do",
+              ...this.fields,
+            };
+            const yaml = Object.entries(fm)
+              .filter(([, v]) => v !== "" && v != null)
+              .map(
+                ([k, v]) => k + ": " + (Array.isArray(v) ? "\n  - " + v.join("\n  - ") : JSON.stringify(v)),
+              )
+              .join("\n");
+            await this.app.vault.create(path, "---\n" + yaml + "\n---\n");
+            new Notice("Created " + path);
+            this.close();
+            this.plugin.refresh();
+          } catch (e) {
+            new Notice("Could not create note: " + e.message);
+          }
+        }),
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+class OMBillingModal extends Modal {
+  constructor(app, plugin, record) {
+    super(app);
+    this.plugin = plugin;
+    this.record = record;
+    this.cycle = String(record.fm.Billing ?? "");
+    this.date = iso(record.fm.Next_Billing) ?? "";
+  }
+  onOpen() {
+    const c = this.contentEl;
+    c.createEl("h2", { text: "Billing schedule: " + this.record.file.basename });
+    c.createEl("p", {
+      text: "Billing is separate from contract renewal. Cost is the total amount charged each billing cycle, regardless of License_Seats.",
+    });
+    new Setting(c).setName("Billing frequency").addDropdown((d) => {
+      for (const [value, label] of [
+        ["", "Not set"],
+        ["Monthly", "Monthly"],
+        ["Quarterly", "Quarterly"],
+        ["Semiannually", "Every 6 months"],
+        ["Annually", "Annually"],
+      ])
+        d.addOption(value, label);
+      if (this.cycle && !["Monthly", "Quarterly", "Semiannually", "Annually"].includes(this.cycle))
+        d.addOption(this.cycle, this.cycle);
+      d.setValue(this.cycle).onChange((v) => (this.cycle = v));
+    });
+    new Setting(c)
+      .setName("Next billing date")
+      .setDesc("YYYY-MM-DD")
+      .addText((t) =>
+        t
+          .setPlaceholder("2026-11-01")
+          .setValue(this.date)
+          .onChange((v) => (this.date = v.trim())),
+      );
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Save billing")
+        .setCta()
+        .onClick(async () => {
+          if (this.cycle && !omBillingCycle({ Billing: this.cycle })) {
+            new Notice("Choose a supported billing frequency");
+            return;
+          }
+          if (this.date && !iso(this.date)) {
+            new Notice("Enter a valid YYYY-MM-DD date");
+            return;
+          }
+          try {
+            await this.app.fileManager.processFrontMatter(this.record.file, (fm) => {
+              if (this.cycle) fm.Billing = this.cycle;
+              else delete fm.Billing;
+              if (this.date) fm.Next_Billing = this.date;
+              else delete fm.Next_Billing;
+            });
+            this.record.fm.Billing = this.cycle;
+            this.record.fm.Next_Billing = this.date;
+            this.close();
+            this.plugin.refresh();
+            if (this.plugin.licenseSettingsTab) this.plugin.licenseSettingsTab.display();
+            new Notice("Billing schedule saved");
+          } catch (e) {
+            new Notice("Unable to save billing: " + e.message);
+          }
+        }),
+    );
+  }
+}
+class OMRecordChargeModal extends Modal {
+  constructor(app, plugin, record) {
+    super(app);
+    this.plugin = plugin;
+    this.record = record;
+  }
+  onOpen() {
+    const current = omBillingInfo(this.record.fm);
+    const c = this.contentEl;
+    c.createEl("h2", { text: "Record billing charge" });
+    if (!current) {
+      c.createEl("p", { text: "Set Billing and Next_Billing in plugin settings first." });
+      return;
+    }
+    const next = addMonths(current.date, current.months);
+    c.createEl("p", { text: "Current charge date: " + current.date });
+    c.createEl("p", { text: "Next charge date: " + next });
+    if (current.amount !== null) c.createEl("p", { text: "Estimated charge: " + omUSD(current.amount) });
+    c.createEl("p", {
+      text: "Confirm only after this scheduled charge has occurred. The contract renewal date will not change.",
+    });
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Record charge")
+        .setCta()
+        .onClick(async () => {
+          try {
+            await this.app.fileManager.processFrontMatter(this.record.file, (fm) => {
+              if (iso(fm.Next_Billing) !== current.date)
+                throw Error("Billing date changed; reopen this dialog");
+              const history = Array.isArray(fm.Billing_History)
+                ? fm.Billing_History
+                : fm.Billing_History
+                  ? [fm.Billing_History]
+                  : [];
+              if (!history.some((v) => iso(v) === current.date)) history.push(current.date);
+              fm.Billing_History = history;
+              fm.Last_Billed = current.date;
+              fm.Next_Billing = next;
+            });
+            this.record.fm.Next_Billing = next;
+            this.close();
+            this.plugin.refresh();
+            if (this.plugin.licenseSettingsTab) this.plugin.licenseSettingsTab.display();
+            new Notice("Charge recorded; next billing date updated");
+          } catch (e) {
+            new Notice("Unable to record charge: " + e.message);
+          }
+        }),
+    );
+  }
+}
+class RenewModal extends Modal {
+  constructor(app, plugin, file, fm) {
+    super(app);
+    this.plugin = plugin;
+    this.file = file;
+    this.fm = fm;
+  }
+  onOpen() {
+    const c = this.contentEl;
+    c.createEl("h2", { text: "Complete renewal: " + this.file.basename });
+    const current = inferredRenewal(this.fm);
+    if (!current) {
+      c.createEl("p", {
+        text: "Manual review required: enter a confirmed Next_Renewal date, or a valid Ordered date and Renewal term in days.",
+      });
+      return;
+    }
+    const days = Number(this.fm.Renewal),
+      months = termMonths(this.fm);
+    const variable = /variable|manual|negotiat|tbd|unknown|custom/i.test(
+      String(this.fm.Renewal ?? "") +
+        " " +
+        String(this.fm.Renewal_Term ?? "") +
+        " " +
+        String(this.fm.Renewal_Type ?? ""),
+    );
+    const fixedDays = Number.isInteger(days) && days > 0 && days <= 36500;
+    const fixedMonths = months != null;
+    if (variable || (!fixedDays && !fixedMonths)) {
+      c.createEl("p", {
+        text: "Manual review required: renewal term is variable, missing, or not a positive number of days/months. No automatic date advancement will occur.",
+      });
+      return;
+    }
+    const old = current.date;
+    let next;
+    if (fixedDays) {
+      const d = new Date(old + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() + days);
+      next = dateISO(d);
+    } else next = addMonths(old, months);
+    c.createEl("p", { text: "Current renewal: " + old + (current.estimated ? " (estimated)" : "") });
+    c.createEl("p", { text: "Next renewal after completion: " + next });
+    c.createEl("p", {
+      text: "This preserves Ordered, appends the current renewal to history, and creates a follow-up task in this note.",
+    });
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Confirm completion")
+        .setCta()
+        .onClick(async () => {
+          try {
+            await this.app.fileManager.processFrontMatter(this.file, (fm) => {
+              const check = inferredRenewal(fm);
+              if (!check || check.date !== old) throw Error("Renewal date changed; reopen this dialog");
+              const history = Array.isArray(fm.Renewal_History)
+                ? fm.Renewal_History
+                : fm.Renewal_History
+                  ? [fm.Renewal_History]
+                  : [];
+              if (!history.some((v) => iso(v) === old)) history.push(old);
+              fm.Renewal_History = history;
+              fm.Last_Renewed = old;
+              fm.Next_Renewal = next;
+              fm.Renewal_Review_Required = false;
+            });
+            const note = await this.app.vault.read(this.file);
+            const task = "- [ ] Review renewal for " + this.file.basename + " 📅 " + next;
+            if (!note.includes(task))
+              await this.app.vault.append(this.file, "\\n## Renewal follow-up\\n" + task + "\\n");
+            new Notice("Renewal completed; history, next date and reminder saved");
+            this.close();
+            this.plugin.refresh();
+          } catch (e) {
+            new Notice("Renewal needs review: " + e.message);
+          }
+        }),
+    );
+  }
+}
+class PaidModal extends Modal {
+  constructor(app, plugin, file) {
+    super(app);
+    this.plugin = plugin;
+    this.file = file;
+    this.date = dateISO(new Date());
+  }
+  onOpen() {
+    const c = this.contentEl;
+    c.createEl("h2", { text: "Mark invoice paid" });
+    new Setting(c)
+      .setName("Payment date")
+      .addText((t) => t.setValue(this.date).onChange((v) => (this.date = v)));
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Confirm payment")
+        .setCta()
+        .onClick(async () => {
+          if (!iso(this.date)) {
+            new Notice("Use YYYY-MM-DD");
+            return;
+          }
+          try {
+            await this.app.fileManager.processFrontMatter(this.file, (fm) => {
+              fm.Status = "complete";
+              fm.Paid_Date = this.date;
+            });
+            new Notice("Invoice marked paid");
+            this.close();
+            this.plugin.refresh();
+          } catch (e) {
+            new Notice(e.message);
+          }
+        }),
+    );
+  }
+}
+function omCardLinkedText(parent, value, app, sourcePath) {
+  const text = Array.isArray(value) ? value.map(String).join(", ") : String(value ?? "");
+  const parts = text.split(/(\[\[[^\]]+\]\])/g);
+  for (const part of parts) {
+    const match = part.match(/^\[\[([^\]]+)\]\]$/);
+    if (!match) {
+      parent.createSpan({ text: part });
+      continue;
+    }
+    const [target, alias] = match[1].split("|");
+    const link = parent.createEl("a", { cls: "internal-link", text: alias || target });
+    link.href = "#";
+    link.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      app.workspace.openLinkText(target, sourcePath, false);
+    };
+  }
+}
+function omDashboardDeviceDetails(info, record, app, followUp) {
+  const employee = record.fm.Employee ?? record.fm.Assigned_To;
+  const hasEmployee = employee !== undefined && employee !== null && String(employee).trim() !== "";
+  if (hasEmployee || followUp) {
+    const line = info.createEl("small");
+    if (hasEmployee) omCardLinkedText(line, employee, app, record.file.path);
+    if (followUp) line.createSpan({ text: (hasEmployee ? " · " : "") + "Follow up" });
+  }
+  const notes = record.fm.Notes;
+  if (notes !== undefined && notes !== null && String(notes).trim()) {
+    const noteLine = info.createDiv({ cls: "ops-equipment-note" });
+    noteLine.createSpan({ text: "Notes: " });
+    omCardLinkedText(noteLine, notes, app, record.file.path);
+  }
+}
+const OM_CARD_ICONS = {
+  renewal: "clock",
+  invoice: "file-text",
+  device: "laptop",
+  order: "package",
+  followup: "flag",
+};
+const OM_LEGACY_ICONS = {
+  "◷": "clock",
+  "▤": "file-text",
+  "▭": "laptop",
+  "▣": "package",
+  "◉": "circle-dot",
+  "◆": "diamond",
+  "★": "star",
+  "⚑": "flag",
+  "✓": "check",
+  "!": "alert-circle",
+  "•": "dot",
+  "—": "none",
+};
+class OMIconPicker extends require("obsidian").SuggestModal {
+  constructor(app, plugin, kind, label, onPick) {
+    super(app);
+    this.plugin = plugin;
+    this.kind = kind;
+    this.label = label;
+    this.onPick = onPick;
+    this.setPlaceholder("Search Lucide icons by name...");
+    this.setInstructions([
+      { command: "↑↓", purpose: "Navigate" },
+      { command: "↵", purpose: "Select" },
+    ]);
+    this.icons = ["none", ...require("obsidian").getIconIds().sort()];
+  }
+  getSuggestions(query) {
+    const q = query.trim().toLowerCase().replace(/\\s+/g, "-");
+    return this.icons.filter((id) => id.includes(q)).slice(0, 100);
+  }
+  renderSuggestion(id, el) {
+    el.addClass("ops-icon-suggestion");
+    const preview = el.createSpan({ cls: "ops-icon-preview" });
+    if (id !== "none") require("obsidian").setIcon(preview, id);
+    el.createSpan({ text: id === "none" ? "No icon" : id.replace(/-/g, " ") });
+  }
+  onChooseSuggestion(id) {
+    this.onPick(id);
+  }
+}
+class OMEmbeddedDashboard extends require("obsidian").MarkdownRenderChild {
+  constructor(el, plugin) {
+    super(el);
+    this.contentEl = el;
+    this.plugin = plugin;
+    this.app = plugin.app;
+    this.page = "dashboard";
+  }
+  async onload() {
+    this.plugin.embeddedDashboards.add(this);
+    await this.render();
+  }
+  onunload() {
+    this.plugin.embeddedDashboards.delete(this);
+  }
+  async render() {
+    return OperationsView.prototype.render.call(this);
+  }
+  renderInvoices(root, records) {
+    return OperationsView.prototype.renderInvoices.call(this, root, records);
+  }
+  renderOrders(root, records) {
+    return OperationsView.prototype.renderOrders.call(this, root, records);
+  }
+  renderLicenseOverviewInline(info, record) {
+    return OperationsView.prototype.renderLicenseOverviewInline.call(this, info, record);
+  }
+}
+module.exports = class OperationsManager extends Plugin {
+  async onload() {
+    this.embeddedDashboards = new Set();
+    this.registerMarkdownCodeBlockProcessor("operations-manager", (_source, el, ctx) => {
+      ctx.addChild(new OMEmbeddedDashboard(el, this));
+    });
+    this.settings = Object.assign(
+      { folder: "Operations Records", renewalWarningDays: 90, cardIcons: {}, collapsedSections: {} },
+      await this.loadData(),
+    );
+    this.settings.renewalWarningDays = 90;
+    this.registerView(VIEW, (leaf) => new OperationsView(leaf, this));
+    this.addRibbonIcon("layout-dashboard", "Open Operations Manager", () => this.activate());
+    this.addCommand({
+      id: "open-dashboard",
+      name: "Open Operations Manager",
+      callback: () => this.activate(),
+    });
+    this.addSettingTab(
+      new (class extends require("obsidian").PluginSettingTab {
+        display() {
+          this.plugin.licenseSettingsTab = this;
+          this.containerEl.empty();
+          this.containerEl.createEl("h2", { text: "Operations Manager" });
+          this.containerEl.createEl("h3", { text: "General" });
+          new Setting(this.containerEl)
+            .setName("Folder for new records")
+            .setDesc("Where new invoices, orders and license notes are created.")
+            .addText((t) =>
+              t.setValue(this.plugin.settings.folder).onChange(async (v) => {
+                this.plugin.settings.folder = v;
+                await this.plugin.saveData(this.plugin.settings);
+              }),
+            );
+          const iconSection = this.containerEl.createEl("details", { cls: "ops-settings-icon-section" });
+          iconSection.createEl("summary", { text: "Customize card icons" });
+          iconSection.createEl("p", {
+            cls: "setting-item-description",
+            text: "Optional. Choose a Lucide icon for each Dashboard card type.",
+          });
+          for (const [kind, label] of [
+            ["renewal", "Renewals & licenses"],
+            ["invoice", "Invoices"],
+            ["device", "Equipment"],
+            ["order", "Orders"],
+            ["followup", "Follow up"],
+          ]) {
+            const setting = new Setting(iconSection).setName(label);
+            const selected = this.plugin.cardIcon(kind);
+            const preview = setting.controlEl.createSpan({ cls: "ops-icon-preview" });
+            if (selected !== "none") require("obsidian").setIcon(preview, selected);
+            setting.addButton((b) =>
+              b.setButtonText(selected === "none" ? "No icon" : selected).onClick(() =>
+                new OMIconPicker(this.app, this.plugin, kind, label, async (icon) => {
+                  this.plugin.settings.cardIcons = {
+                    ...(this.plugin.settings.cardIcons || {}),
+                    [kind]: icon,
+                  };
+                  await this.plugin.saveData(this.plugin.settings);
+                  this.plugin.refresh();
+                  this.display();
+                }).open(),
+              ),
+            );
+          }
+          this.plugin.renderLicenseInventory(
+            this.containerEl,
+            this.plugin
+              .records()
+              .filter((r) => r.kind === "renewal")
+              .sort((a, b) =>
+                a.file.basename.localeCompare(b.file.basename, undefined, {
+                  numeric: true,
+                  sensitivity: "base",
+                }),
+              ),
+          );
+        }
+      })(this.app, this),
+    );
+    this.renewalSyncPending = new Set();
+    this.registerEvent(
+      this.app.metadataCache.on("changed", (file) => {
+        this.populateNextRenewal(file);
+        this.refresh();
+      }),
+    );
+    this.app.workspace.onLayoutReady(() => {
+      for (const file of this.app.vault.getMarkdownFiles()) this.populateNextRenewal(file);
+    });
+  }
+  cardIcon(kind) {
+    const value = this.settings.cardIcons?.[kind] ?? OM_CARD_ICONS[kind] ?? "circle";
+    return OM_LEGACY_ICONS[value] ?? value;
+  }
+  renderCardIcon(parent, kind) {
+    const name = this.cardIcon(kind);
+    const holder = parent.createSpan({ cls: "ops-item-icon" });
+    if (name !== "none") require("obsidian").setIcon(holder, name);
+    return holder;
+  }
+  async populateNextRenewal(file) {
+    if (
+      !file ||
+      file.extension !== "md" ||
+      this.renewalSyncPending.has(file.path) ||
+      file.path
+        .split("/")
+        .slice(0, -1)
+        .some((p) => p.toLowerCase() === "templates")
+    )
+      return;
+    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    if (
+      !fm ||
+      omTerminated(fm) ||
+      classified(file, fm) !== "renewal" ||
+      omMonthToMonth(fm, file) ||
+      (fm.Next_Renewal != null && String(fm.Next_Renewal).trim() !== "")
+    )
+      return;
+    const next = inferredRenewal(fm);
+    if (!next || !next.estimated) return;
+    this.renewalSyncPending.add(file.path);
+    try {
+      await this.app.fileManager.processFrontMatter(file, (front) => {
+        if (front.Next_Renewal == null || String(front.Next_Renewal).trim() === "") {
+          const computed = inferredRenewal(front);
+          if (computed?.estimated) front.Next_Renewal = computed.date;
+        }
+      });
+    } catch (e) {
+      console.warn("Operations Manager: could not populate Next_Renewal for " + file.path, e);
+    } finally {
+      this.renewalSyncPending.delete(file.path);
+    }
+  }
+  records() {
+    const result = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      if (
+        file.path
+          .split("/")
+          .slice(0, -1)
+          .some((part) => part.toLowerCase() === "templates")
+      )
+        continue;
+      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+      if (!fm) continue;
+      if (omTerminated(fm)) continue;
+      if (tagSet(fm, file, this.app).has("call_notes") || tagSet(fm, file, this.app).has("meeting_notes"))
+        continue;
+      const tags = tagSet(fm, file, this.app);
+      const kind = tags.has("equip_ug") ? "order" : classified(file, fm);
+      if (!kind) continue;
+      const st = status(fm);
+      const done = [
+        "paid",
+        "complete",
+        "completed",
+        "deployed",
+        "closed",
+        "retired",
+        "unused",
+        "in stock",
+        "spare",
+        "available",
+        "cancelled",
+        "canceled",
+      ].includes(st);
+      if (["archive", "archived"].includes(st) || tags.has("archive")) continue;
+      let reason = "",
+        attention = false;
+      const monthly = kind === "renewal" && omMonthToMonth(fm, file);
+      const renewal = monthly ? null : inferredRenewal(fm);
+      if (kind === "renewal") {
+        if (monthly) {
+          reason = "Month-to-month · No expiration";
+        } else if (renewal) {
+          const days = daysUntil(renewal.date);
+          const qualifier = renewal.estimated ? "Estimated renewal" : "Renewal";
+          reason = qualifier + " " + renewal.date;
+          if (omRenewalAlertsEnabled(fm) && omAlertColor(this, file, "renewal", days)) {
+            attention = true;
+            reason += days < 0 ? " (past due by " + -days + " days)" : " (in " + days + " days)";
+          }
+        } else {
+          reason = "Renewal date needs review: enter Next_Renewal or Ordered and Renewal (days)";
+          attention = omRenewalAlertsEnabled(fm);
+        }
+        const billing = omBillingAlertsEnabled(fm) ? omBillingInfo(fm) : null;
+        if (billing && omAlertColor(this, file, "billing", billing.days)) {
+          attention = true;
+          if (
+            !renewal ||
+            !omRenewalAlertsEnabled(fm) ||
+            !omAlertColor(this, file, "renewal", daysUntil(renewal.date))
+          )
+            reason =
+              "Upcoming charge " +
+              billing.date +
+              (billing.days < 0
+                ? " (past due by " + -billing.days + " days)"
+                : " (in " + billing.days + " days)");
+        }
+      }
+      if (kind === "invoice") {
+        const paid =
+          ["paid", "complete", "completed"].includes(st) ||
+          fm.Paid === true ||
+          !!iso(fm.Payment_Date ?? fm.Paid_Date);
+        const due = iso(fm.Due_Date);
+        const invoiceDate = iso(fm.Date);
+        reason = paid
+          ? "Paid"
+          : (invoiceDate ? "Invoice date " + invoiceDate + " · " : "") +
+            (due ? "Unpaid · Due " + due : "Unpaid · Due date not recorded");
+        attention = !paid;
+      }
+      if (kind === "project") {
+        reason = st || "Planned";
+        attention = false;
+      }
+      if (kind === "order") {
+        reason = st || "Status not set";
+        attention = !done;
+      }
+      if (kind === "device") {
+        reason = st || "Status not set";
+        attention = !done && ["in progress", "pending", "ordered", "to do", "awaiting setup"].includes(st);
+      }
+      if (
+        (kind === "order" || kind === "device") &&
+        (tags.has("equip_ug") || tags.has("equip_upgrade") || tags.has("equip_ug"))
+      ) {
+        const ordered = iso(fm.Ordered ?? fm.Order_Date);
+        const setup = iso(fm.Set_Up ?? fm.Set_up);
+        attention = tags.has("equip_ug") ? st !== "complete" : !ordered || !setup;
+        reason =
+          st === "complete"
+            ? "Complete"
+            : !ordered
+              ? "Not ordered — Ordered date missing"
+              : !setup
+                ? "Ordered " + ordered + " — Set_Up date missing"
+                : "Follow-up needed · Status: " + (st || "not set");
+      }
+      result.push({ file, fm, kind, attention, reason, done, equipUp: tags.has("equip_ug") });
+    }
+    return result.sort(
+      (a, b) => Number(b.attention) - Number(a.attention) || a.file.basename.localeCompare(b.file.basename),
+    );
+  }
+  licenseField(license) {
+    return String(license.fm.License_Field ?? license.fm.License_Name ?? license.file.basename).trim();
+  }
+  employeeNotes() {
+    return this.app.vault
+      .getMarkdownFiles()
+      .filter(
+        (file) =>
+          !file.path
+            .split("/")
+            .slice(0, -1)
+            .some((p) => p.toLowerCase() === "templates"),
+      )
+      .map((file) => ({ file, fm: this.app.metadataCache.getFileCache(file)?.frontmatter }))
+      .filter(
+        (e) =>
+          e.fm &&
+          !omTerminated(e.fm) &&
+          !tagSet(e.fm).has("call_notes") &&
+          !tagSet(e.fm).has("meeting_notes") &&
+          !tagSet(e.fm).has("archive"),
+      );
+  }
+  licenseInventory(license) {
+    const field = this.licenseField(license);
+    const employees = this.employeeNotes().filter(
+      (e) =>
+        Object.keys(e.fm).some((k) => k.toLowerCase() === field.toLowerCase()) ||
+        tagSet(e.fm).has("employee") ||
+        e.file.path.split("/").some((p) => /^employees?$/i.test(p)),
+    );
+    employees.sort((a, b) =>
+      a.file.basename.localeCompare(b.file.basename, undefined, { sensitivity: "base", numeric: true }),
+    );
+    const assigned = employees.filter((e) =>
+      Object.entries(e.fm).some(([k, v]) => k.toLowerCase() === field.toLowerCase() && omLicenseAssigned(v)),
+    ).length;
+    const raw = license.fm.License_Seats;
+    const total =
+      raw !== undefined && raw !== null && raw !== "" && Number.isInteger(Number(raw)) && Number(raw) >= 0
+        ? Number(raw)
+        : null;
+    return { field, employees, assigned, total, available: total === null ? null : total - assigned };
+  }
+  renderLicenseInventory(root, records) {
+    const section = root.createDiv({ cls: "ops-settings-licenses" });
+    section.createEl("h3", { text: "Licenses & agreements" });
+    section.createEl("p", {
+      cls: "setting-item-description",
+      text: "Select a vendor to manage its alerts, billing, seats and assignments. Your existing notes remain the source of truth.",
+    });
+    const toolbar = section.createDiv({ cls: "ops-settings-toolbar" });
+    const search = toolbar.createEl("input", {
+      type: "search",
+      placeholder: "Find a license or vendor…",
+      cls: "ops-settings-search",
+    });
+    search.setAttribute("aria-label", "Search licenses");
+    const count = toolbar.createSpan({ cls: "ops-settings-count" });
+    const list = section.createDiv({ cls: "ops-settings-list" });
+    const show = () => {
+      list.empty();
+      const filtered = records.filter((r) =>
+        r.file.basename.toLowerCase().includes(search.value.trim().toLowerCase()),
+      );
+      count.setText(filtered.length + " of " + records.length);
+      if (!filtered.length) {
+        list.createEl("p", { cls: "setting-item-description", text: "No matching licenses." });
+        return;
+      }
+      for (const license of filtered) {
+        const inv = this.licenseInventory(license),
+          multi = omNextivaTypes(license.fm),
+          hasTypes = multi.length > 0,
+          seatBased = omTracksSeats(license.fm);
+        const summary = hasTypes ? omNextivaSummary(this, license) : null;
+        const bought = hasTypes ? summary.rows.reduce((n, x) => n + x.purchased, 0) : inv.total;
+        const used = hasTypes ? summary.rows.reduce((n, x) => n + x.assigned, 0) : inv.assigned;
+        const available = bought === null ? null : bought - used;
+        const charge = omRenewalEstimate(license.fm)?.amount ?? null;
+        const frequency = omBillingCycle(license.fm)?.label?.toLowerCase() ?? "cycle";
+        const key = "settings:license:" + license.file.path;
+        const details = list.createEl("details", { cls: "ops-settings-license" });
+        details.open = this.settings.collapsedSections?.[key] === true;
+        details.addEventListener("toggle", () => {
+          if (this.settings.collapsedSections?.[key] === details.open) return;
+          this.settings.collapsedSections = {
+            ...(this.settings.collapsedSections || {}),
+            [key]: details.open,
+          };
+          this.saveData(this.settings);
+        });
+        const head = details.createEl("summary", { cls: "ops-settings-license-summary" });
+        const heading = head.createSpan({ cls: "ops-settings-license-name", text: license.file.basename });
+        const chips = head.createSpan({ cls: "ops-settings-license-meta" });
+        if (seatBased && bought !== null)
+          chips.createSpan({ text: available + " available / " + bought + " purchased" });
+        if (charge !== null) chips.createSpan({ text: omUSD(charge) + " / " + frequency });
+        const body = details.createDiv({ cls: "ops-settings-license-body" });
+        const actions = body.createDiv({ cls: "ops-settings-actions" });
+        const open = actions.createEl("button", { text: "Open source note" });
+        open.onclick = () => this.app.workspace.getLeaf(false).openFile(license.file);
+        const agreement = actions.createEl("button", { text: "Agreement types" });
+        agreement.onclick = () => new OMAgreementTypesModal(this.app, this, license).open();
+        const alerts = body.createDiv({ cls: "ops-settings-group" });
+        alerts.createEl("h4", { text: "Dashboard alerts" });
+        alerts.createEl("p", {
+          cls: "setting-item-description",
+          text: "Choose what deserves attention. Renewal colors keep the existing 90-day warning system.",
+        });
+        for (const [field, label, description, enabled] of [
+          [
+            "Renewal_Alerts",
+            "Contract renewals",
+            "Notify when this contract approaches renewal.",
+            omRenewalAlertsEnabled(license.fm),
+          ],
+          [
+            "Billing_Alerts",
+            "Upcoming charges",
+            "Notify before a scheduled billing charge.",
+            omBillingAlertsEnabled(license.fm),
+          ],
+          ...(seatBased
+            ? [
+                [
+                  "Seat_Alerts",
+                  "Low seat availability",
+                  "Notify when 5 or fewer purchased seats remain.",
+                  omSeatAlertsEnabled(license.fm),
+                ],
+              ]
+            : []),
+        ]) {
+          new Setting(alerts)
+            .setName(label)
+            .setDesc(description)
+            .addToggle((t) =>
+              t.setValue(enabled).onChange(async (value) => {
+                try {
+                  await this.app.fileManager.processFrontMatter(license.file, (fm) => {
+                    fm[field] = value;
+                  });
+                  license.fm[field] = value;
+                  this.refresh();
+                  new Notice(label + (value ? " enabled" : " disabled"));
+                } catch (error) {
+                  new Notice("Unable to update alert: " + error.message);
+                }
+              }),
+            );
+        }
+        const customize = alerts.createEl("button", { text: "Customize alert timing & colors" });
+        customize.onclick = () => new OMAlertRulesModal(this.app, this, license).open();
+        const billing = body.createDiv({ cls: "ops-settings-group" });
+        billing.createEl("h4", { text: "Billing & renewals" });
+        const current = omBillingCycle(license.fm),
+          next = iso(license.fm.Next_Billing),
+          renewal = omMonthToMonth(license.fm, license.file) ? null : inferredRenewal(license.fm);
+        billing.createEl("p", {
+          cls: "ops-settings-facts",
+          text:
+            "Billing: " +
+            (current?.label ?? "Not set") +
+            " · Next charge: " +
+            (next ?? "Not set") +
+            " · Renewal: " +
+            (renewal?.date ?? "Not set"),
+        });
+        if (charge !== null)
+          billing.createEl("p", {
+            cls: "ops-settings-facts",
+            text: "Expected charge: " + omUSD(charge) + " / " + frequency,
+          });
+        const schedule = billing.createEl("button", { text: "Edit billing schedule" });
+        schedule.onclick = () => new OMBillingModal(this.app, this, license).open();
+        const contractDate = billing.createEl("button", {
+          text: renewal ? "Edit renewal date" : "Set contract renewal date",
+        });
+        contractDate.onclick = () => new OMContractDateModal(this.app, this, license).open();
+        if (seatBased || /nextiva/i.test(license.file.basename)) {
+          const seats = body.createDiv({ cls: "ops-settings-group" });
+          seats.createEl("h4", { text: "Seats & assignments" });
+          if (hasTypes || /nextiva/i.test(license.file.basename)) {
+            if (hasTypes) {
+              seats.createEl("p", {
+                cls: "ops-settings-facts",
+                text:
+                  multi.length +
+                  " license types · " +
+                  bought +
+                  " purchased · " +
+                  used +
+                  " assigned · " +
+                  available +
+                  " available · Calculated subtotal: " +
+                  omUSD(summary.total) +
+                  " (not recorded Cost)",
+              });
+              for (const t of multi)
+                seats.createEl("p", {
+                  cls: "ops-settings-facts",
+                  text: t.name + " → " + (t.field || "Nextiva_Licenses"),
+                });
+            } else
+              seats.createEl("p", {
+                cls: "ops-settings-facts",
+                text: "No license types configured yet. Add each Nextiva license type, its monthly price, and purchased seat count.",
+              });
+            const typeBtn = seats.createEl("button", {
+              text: hasTypes ? "Manage license types" : "Add license types",
+            });
+            typeBtn.onclick = () => new OMNextivaTypesModal(this.app, this, license).open();
+            if (hasTypes) {
+              const employeeBtn = seats.createEl("button", { text: "Assign employee licenses" });
+              employeeBtn.onclick = () => new OMNextivaAssignmentsModal(this.app, this, license).open();
+            }
+          } else {
+            seats.createEl("p", {
+              cls: "ops-settings-facts",
+              text:
+                bought === null
+                  ? "Purchased seats not set"
+                  : bought + " purchased · " + used + " assigned · " + available + " available",
+            });
+            const set = seats.createEl("button", { text: "Set purchased seats" });
+            set.onclick = () => new OMSeatCountModal(this.app, this, license).open();
+            seats.createEl("p", {
+              cls: "ops-settings-facts",
+              text: "Employee property: " + this.licenseField(license),
+            });
+            const fieldButton = seats.createEl("button", { text: "Choose employee property" });
+            fieldButton.onclick = () => new OMLicenseFieldModal(this.app, this, license).open();
+            const manage = seats.createEl("button", { text: "Manage employees" });
+            manage.onclick = () => new OMEmployeeLicenseModal(this.app, this, license, inv.employees).open();
+          }
+        }
+      }
+    };
+    search.addEventListener("input", show);
+    show();
+  }
+
+  renderSeatAvailability(root, records) {
+    const seats = records.filter((r) => {
+      const raw = r.fm.Agreement_Types ?? r.fm.Agreement_Type ?? r.fm.License_Type ?? [];
+      const types = (Array.isArray(raw) ? raw : String(raw).split(",")).map((v) =>
+        String(v).trim().toLowerCase(),
+      );
+      return (
+        omNextivaTypes(r.fm).length > 0 ||
+        types.some((t) => ["software seats", "seat", "software", "per-user"].includes(t)) ||
+        this.licenseInventory(r).total !== null
+      );
+    });
+    if (!seats.length) return;
+    root.createEl("h2", { cls: "ops-equipment-heading", text: "License Overview" });
+    const list = root.createDiv({ cls: "ops-license-overviews" });
+    for (const r of seats) {
+      const types = omNextivaTypes(r.fm);
+      const multi = types.length > 0;
+      const inv = this.licenseInventory(r);
+      const breakdown = multi ? omNextivaSummary(this, r) : null;
+      const purchased = multi ? breakdown.rows.reduce((n, x) => n + x.purchased, 0) : inv.total;
+      const assigned = multi ? breakdown.rows.reduce((n, x) => n + x.assigned, 0) : inv.assigned;
+      const available = purchased === null ? null : purchased - assigned;
+      const alerts = omSeatAlertsEnabled(r.fm);
+      const severity =
+        alerts && available !== null
+          ? available <= 2
+            ? " ops-seat-warning"
+            : available >= 3 && available <= 5
+              ? " ops-seat-moderate"
+              : ""
+          : "";
+      const card = list.createDiv({ cls: "ops-license-overview ops-attention-item" + severity });
+      const info = card.createDiv({ cls: "ops-item-info" });
+      const title = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
+      title.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
+      const billing = omBillingCycle(r.fm);
+      const total = omRenewalEstimate(r.fm)?.amount ?? null;
+      const perSeat = total !== null && purchased !== null && purchased > 0 ? total / purchased : null;
+      info.createEl("small", {
+        text:
+          purchased === null
+            ? "Purchased seats unknown"
+            : purchased + " purchased · " + assigned + " assigned · " + available + " available",
+      });
+      info.createEl("small", {
+        text:
+          "Billing total: " +
+          (total === null ? "Not set" : omUSD(total)) +
+          " / " +
+          (billing?.label?.toLowerCase() ?? "billing period") +
+          (perSeat !== null ? " · Derived: " + omUSD(perSeat) + " / purchased seat" : ""),
+      });
+      if (multi) {
+        const details = info.createEl("details", { cls: "ops-license-overview-details" });
+        const key = "licenses:overview:types:" + r.file.path;
+        details.open = this.settings.collapsedSections?.[key] === true;
+        details.addEventListener("toggle", () => {
+          if (this.settings.collapsedSections?.[key] === details.open) return;
+          this.settings.collapsedSections = {
+            ...(this.settings.collapsedSections || {}),
+            [key]: details.open,
+          };
+          this.saveData(this.settings);
+        });
+        details.createEl("summary", { text: "License types (" + breakdown.rows.length + ")" });
+        const table = details.createEl("table");
+        const header = table.createEl("tr");
+        for (const label of ["Type", "Purchased", "Assigned", "Available", "Rate", "Monthly total"])
+          header.createEl("th", { text: label });
+        for (const item of breakdown.rows) {
+          const tr = table.createEl("tr");
+          for (const val of [
+            item.name,
+            item.purchased,
+            item.assigned,
+            item.available,
+            omUSD(item.rate),
+            omUSD(item.cost),
+          ])
+            tr.createEl("td", { text: String(val) });
+          if (item.holders.length) {
+            const peopleRow = table.createEl("tr");
+            const peopleCell = peopleRow.createEl("td");
+            peopleCell.colSpan = 6;
+            peopleCell.createSpan({ text: "Assigned: " });
+            for (const [index, employee] of item.holders.entries()) {
+              if (index) peopleCell.createSpan({ text: ", " });
+              const link = peopleCell.createEl("a", {
+                cls: "internal-link",
+                text: employee.file.basename,
+                href: "#",
+              });
+              link.onclick = (e) => {
+                e.preventDefault();
+                this.app.workspace.getLeaf(false).openFile(employee.file);
+              };
+            }
+          }
+        }
+        const assign = info.createEl("button", { text: "Manage type assignments" });
+        assign.onclick = () => new OMNextivaAssignmentsModal(this.app, this, r).open();
+      } else {
+        const linked = inv.employees.filter((e) =>
+          Object.entries(e.fm).some(
+            ([key, value]) => key.toLowerCase() === inv.field.toLowerCase() && omLicenseAssigned(value),
+          ),
+        );
+        const details = info.createEl("details", { cls: "ops-license-overview-details" });
+        const key = "licenses:overview:people:" + r.file.path;
+        details.open = this.settings.collapsedSections?.[key] === true;
+        details.addEventListener("toggle", () => {
+          if (this.settings.collapsedSections?.[key] === details.open) return;
+          this.settings.collapsedSections = {
+            ...(this.settings.collapsedSections || {}),
+            [key]: details.open,
+          };
+          this.saveData(this.settings);
+        });
+        details.createEl("summary", { text: "Assigned employees (" + linked.length + ")" });
+        for (const employee of linked) {
+          const link = details.createEl("button", { text: employee.file.basename });
+          link.onclick = () => this.app.workspace.getLeaf(false).openFile(employee.file);
+        }
+        if (!linked.length) details.createEl("small", { text: "No assigned employees." });
+        const assign = info.createEl("button", { text: "Manage employee assignments" });
+        assign.onclick = () => new OMEmployeeLicenseModal(this.app, this, r, inv.employees).open();
+      }
+    }
+  }
+  renderEquipmentPhases(root, records, mode = "phase") {
+    const dashboard = mode === "phase";
+    const heading = root.createEl(dashboard ? "h2" : "h3", {
+      text: dashboard ? "Equipment by Phase" : "Equipment by Status",
+    });
+    heading.addClass("ops-equipment-heading");
+    let sortBy = "filename";
+    const controls = root.createDiv({ cls: "ops-equipment-controls" });
+    if (!dashboard) {
+      new Setting(controls).setName("Sort devices by").addDropdown((d) =>
+        d
+          .addOption("filename", "Filename")
+          .addOption("employee", "Employee name")
+          .setValue(sortBy)
+          .onChange((v) => {
+            sortBy = v;
+            draw();
+          }),
+      );
+    }
+    const area = root.createDiv({ cls: "ops-equipment-groups" });
+    const employeeName = (r) => {
+      const v = r.fm.Employee ?? r.fm.Assigned_To ?? "";
+      return Array.isArray(v) ? v.map(String).join(", ") : String(v);
+    };
+    const populated = (v) => v !== undefined && v !== null && String(v).trim() !== "";
+    const showValue = (v) =>
+      Array.isArray(v)
+        ? v.map(String).join(", ")
+        : typeof v === "object" && v !== null
+          ? JSON.stringify(v)
+          : String(v);
+    const draw = () => {
+      area.empty();
+      const groups = new Map();
+      for (const r of records) {
+        const raw = dashboard ? (r.fm.Approved ?? r.fm.approved) : (r.fm.Status ?? r.fm.status);
+        let group = populated(raw) ? String(raw).trim() : dashboard ? "Unassigned phase" : "No status";
+        if (dashboard) {
+          const match = group.match(/Phase\b.*$/i);
+          if (match) group = match[0];
+        }
+        if (!groups.has(group)) groups.set(group, []);
+        groups.get(group).push(r);
+      }
+      const names = [...groups.keys()].sort((a, b) =>
+        !dashboard && a.toLowerCase() === "complete"
+          ? 1
+          : !dashboard && b.toLowerCase() === "complete"
+            ? -1
+            : a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+      );
+      if (!names.length) area.createEl("p", { text: "No equipment notes found." });
+      for (const group of names) {
+        const items = groups.get(group);
+        const section = area.createEl("details", { cls: "ops-equipment-phase" });
+        const collapseKey = mode + ":" + group;
+        section.open = this.settings.collapsedSections?.[collapseKey] === true;
+        section.addEventListener("toggle", () => {
+          const next = section.open;
+          if (this.settings.collapsedSections?.[collapseKey] === next) return;
+          this.settings.collapsedSections = {
+            ...(this.settings.collapsedSections || {}),
+            [collapseKey]: next,
+          };
+          this.saveData(this.settings);
+        });
+        section.createEl("summary", { text: group + " (" + items.length + ")" });
+        const list = section.createDiv({ cls: "ops-equipment-list" });
+        const ordered = [...items].sort((a, b) =>
+          sortBy === "employee"
+            ? employeeName(a).localeCompare(employeeName(b), undefined, {
+                numeric: true,
+                sensitivity: "base",
+              }) ||
+              a.file.basename.localeCompare(b.file.basename, undefined, {
+                numeric: true,
+                sensitivity: "base",
+              })
+            : a.file.basename.localeCompare(b.file.basename, undefined, {
+                numeric: true,
+                sensitivity: "base",
+              }),
+        );
+        for (const r of ordered) {
+          const card = list.createDiv({ cls: "ops-attention-item ops-equipment-card" });
+          this.renderCardIcon(card, "device");
+          const info = card.createDiv({ cls: "ops-item-info" });
+          const title = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
+          title.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
+          const addLinkedText = (parent, value) => {
+            const parts = showValue(value).split(/(\[\[[^\]]+\]\])/g);
+            for (const part of parts) {
+              const match = part.match(/^\[\[([^\]]+)\]\]$/);
+              if (!match) {
+                parent.createSpan({ text: part });
+                continue;
+              }
+              const [target, alias] = match[1].split("|");
+              const label = alias || target;
+              const link = parent.createEl("a", { text: label, cls: "internal-link" });
+              link.href = "#";
+              link.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.app.workspace.openLinkText(target, r.file.path, false);
+              };
+            }
+          };
+          const summary = info.createEl("small");
+          addLinkedText(summary, employeeName(r) || "No employee");
+          summary.createSpan({
+            text:
+              " · " +
+              (populated(r.fm.Ordered) ? "Ordered" : "Not ordered") +
+              " · " +
+              (populated(r.fm.Set_Up) ? "Set up" : "Not set up"),
+          });
+          const note = r.fm.Notes;
+          if (populated(note)) {
+            const line = info.createDiv({ cls: "ops-equipment-note" });
+            line.createSpan({ text: "Notes: " });
+            addLinkedText(line, note);
+          }
+          const replacing = r.fm.To_Replace;
+          if (populated(replacing)) {
+            const line = info.createDiv({ cls: "ops-equipment-replace" });
+            line.createSpan({ text: "To replace: " });
+            addLinkedText(line, replacing);
+          }
+          const edit = card.createEl("button", { text: "Update", cls: "ops-item-action" });
+          edit.onclick = () => new OMDeviceWorkflowModal(this.app, this, r).open();
+        }
+      }
+    };
+    draw();
+  }
+
+  linkedTo(fm, project) {
+    return omRelated(fm, "Operations_Projects").some((x) => omMatches(x, project));
+  }
+  renderProjects(root) {
+    const projects = this.records().filter((r) => r.kind === "project");
+    const section = root.createDiv({ cls: "ops-projects" });
+    section.createEl("h3", { text: "Master projects & linked records" });
+    if (!projects.length)
+      section.createEl("p", {
+        text: "Create a master project, then link existing device, order, and license notes without moving or duplicating them.",
+      });
+    for (const p of projects) {
+      const related = this.records().filter(
+        (r) => r.file.path !== p.file.path && this.linkedTo(r.fm, p.file),
+      );
+      const card = section.createDiv({ cls: "ops-project-card" });
+      const heading = card.createDiv({ cls: "ops-project-head" });
+      const open = heading.createEl("button", { text: p.file.basename });
+      open.onclick = () => this.app.workspace.getLeaf(false).openFile(p.file);
+      heading.createSpan({ text: related.length + " linked records" });
+      const add = card.createEl("button", { text: "Manage links" });
+      add.onclick = () => new OMLinkModal(this.app, this, p.file).open();
+      const list = card.createDiv({ cls: "ops-project-links" });
+      for (const r of related) {
+        const link = list.createEl("button", { text: r.file.basename + " · " + r.kind });
+        link.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
+      }
+      if (!related.length) list.createEl("small", { text: "No linked devices, licenses, or orders yet." });
+    }
+  }
+  exportNoteTags(file, fm) {
+    return tagSet(fm || {});
+  }
+  exportTagNames() {
+    const tags = new Set();
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
+      for (const tag of this.exportNoteTags(file, fm)) tags.add(tag);
+    }
+    return [...tags].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+  }
+  exportSourceNotes(selection) {
+    if (selection === "tracked") return this.records();
+    const results = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
+      if (selection.startsWith("tag:") && !this.exportNoteTags(file, fm).has(selection.slice(4))) continue;
+      results.push({ file, fm, kind: classified(file, fm) || "note" });
+    }
+    return results.sort(
+      (a, b) =>
+        a.file.basename.localeCompare(b.file.basename, undefined, { numeric: true, sensitivity: "base" }) ||
+        a.file.path.localeCompare(b.file.path),
+    );
+  }
+  exportCellValue(value) {
+    if (value === null || value === undefined) return "";
+    if (value instanceof Date) return dateISO(value);
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  }
+  async exportXLSX(rows, { selection = "tracked", allProperties = false } = {}) {
+    let cols, data;
+    if (allProperties) {
+      const keys = new Set();
+      for (const r of rows)
+        for (const key of Object.keys(r.fm || {})) if (key !== "position" && key !== "---") keys.add(key);
+      const sorted = [...keys].sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+      );
+      cols = [
+        "Name",
+        "Note_Path",
+        "Tags",
+        ...sorted.filter((key) => !["Name", "Note_Path", "Tags"].includes(key)),
+      ];
+      data = rows.map((r) => {
+        const tags = [...this.exportNoteTags(r.file, r.fm)]
+          .map((x) => "#" + x)
+          .sort()
+          .join(", ");
+        return [
+          r.file.basename,
+          r.file.path,
+          tags,
+          ...cols.slice(3).map((key) => this.exportCellValue(r.fm?.[key])),
+        ];
+      });
+    } else {
+      cols = [
+        "Type",
+        "Name",
+        "Status",
+        "Order_Status",
+        "Approved",
+        "Vendor",
+        "Employee",
+        "Serial_Number",
+        "Device_Model",
+        "Cost",
+        "Ordered",
+        "Set_Up",
+        "Old_Device_Returned",
+        "Next_Renewal",
+        "Due_Date",
+        "Project",
+        "Linked_Projects",
+        "Assigned_Licenses",
+        "Note_Path",
+      ];
+      data = rows.map((r) => {
+        const f = r.fm || {};
+        return [
+          r.kind,
+          r.file.basename,
+          f.Status ?? f.status ?? "",
+          f.Order_Status,
+          f.Approved,
+          f.Vendor,
+          f.Employee ?? f.Assigned_To,
+          f.Serial_Number ?? f.Serial,
+          f.Device_Model ?? f.Model,
+          f.Cost,
+          f.Ordered ?? f.Order_Date,
+          f.Set_Up ?? f.Set_up ?? f.Received_Date,
+          f.Old_Device_Returned,
+          inferredRenewal(f)?.date ?? "",
+          f.Due_Date,
+          f.Project ?? f.Parent_Project,
+          omRelated(f, "Operations_Projects").map(omLinkValue).join("; "),
+          omRelated(f, "Assigned_Licenses").map(omLinkValue).join("; "),
+          r.file.path,
+        ];
+      });
+    }
+    const folder = this.settings.folder;
+    const name =
+      selection === "tracked"
+        ? "Operations Records"
+        : selection === "all"
+          ? "All Vault Notes"
+          : "Tag " + selection.slice(4);
+    const safe = name.replace(/[\\/:*?"<>|]/g, "-").slice(0, 90);
+    const base = folder + "/" + safe + " " + dateISO(new Date());
+    let path = normalizePath(base + ".xlsx");
+    let i = 2;
+    while (this.app.vault.getAbstractFileByPath(path)) path = normalizePath(base + " (" + i++ + ").xlsx");
+    try {
+      if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+      const bytes = xlsxWorkbook(cols, data);
+      const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      await this.app.vault.createBinary(path, binary);
+      new Notice("Exported " + rows.length + " notes to " + path);
+      return true;
+    } catch (e) {
+      new Notice("Excel export failed: " + e.message);
+      return false;
+    }
+  }
+
+  async activate() {
+    let leaf = this.app.workspace.getLeavesOfType(VIEW)[0];
+    if (!leaf) {
+      leaf = this.app.workspace.getRightLeaf(false);
+      await leaf.setViewState({ type: VIEW, active: true });
+    }
+    this.app.workspace.revealLeaf(leaf);
+  }
+  refresh() {
+    for (const embedded of this.embeddedDashboards) {
+      Promise.resolve(embedded.render()).catch((err) =>
+        console.error("Operations Manager embedded dashboard refresh failed", err),
+      );
+    }
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW)) {
+      const view = leaf.view;
+      const el = view.contentEl;
+      const scroll = el.querySelector(".view-content") || el;
+      const position = scroll.scrollTop;
+      Promise.resolve(view.render()).then(() => {
+        scroll.scrollTop = position;
+      });
+    }
+  }
 };
