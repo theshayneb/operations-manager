@@ -24,10 +24,9 @@
 .ops-seat-moderate{background:rgba(255,174,82,.10);border-left:3px solid #ffae52}
 .ops-seat-moderate .ops-item-info small{color:#ffae52}
 
-/* Invoice groups use plain collapsible headings, not nested cards. */
-.ops-invoice-section{border:0;background:transparent;padding:0;margin:18px 0 24px;box-shadow:none}
-.ops-invoice-section>summary.ops-equipment-heading{display:list-item;font-size:1.65em;font-weight:700;margin:0 0 10px;padding:4px 0;cursor:pointer}
-.ops-invoice-section>.ops-attention{margin-top:8px}
+/* Invoice Paid/Unpaid groups share the Equipment by Status container/card layout. */
+.ops-invoice-section>.ops-equipment-list{padding-top:12px}
+.ops-invoice-section .ops-equipment-card:last-child{border-bottom:1px solid var(--background-modifier-border)}
 
 .ops-license-inline-details{margin-top:6px;font-size:12px}.ops-license-inline-details>summary{cursor:pointer;color:var(--text-muted);font-size:12px}.ops-license-inline-body{padding:9px 0 4px}.ops-license-inline-body table{width:100%;font-size:12px}.ops-license-inline-body th,.ops-license-inline-body td{text-align:left;padding:5px 8px}.ops-license-inline-body button{margin:4px 6px 4px 0}.ops-license-assignees{padding:5px 0;overflow-wrap:anywhere;font-size:12px}
 
