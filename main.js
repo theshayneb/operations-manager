@@ -416,7 +416,7 @@ function classified(file, fm) {
   const t = tagSet(fm),
     p = file.path.toLowerCase();
   if (t.has("ops-project") || (t.has("project") && p.includes("project"))) return "project";
-  if (t.has("invoice") || p.includes("/invoices/")) return "invoice";
+  if (t.has("invoice") || ("/" + p).includes("/invoices/")) return "invoice";
   if (
     t.has("license") ||
     t.has("licenses") ||
@@ -643,66 +643,6 @@ class OMEmployeeLicenseModal extends Modal {
         );
     }
     if (!matching.length) c.createEl("p", { text: "No matching employee notes." });
-  }
-}
-class OMAgreementTypesModal extends Modal {
-  constructor(app, plugin, record) {
-    super(app);
-    this.plugin = plugin;
-    this.record = record;
-    const fm = record.fm;
-    const raw = fm.Agreement_Types ?? fm.Agreement_Type ?? fm.License_Type ?? [];
-    this.types = new Set(
-      (Array.isArray(raw) ? raw : String(raw).split(","))
-        .map((v) => String(v).trim().toLowerCase())
-        .filter(Boolean),
-    );
-  }
-  onOpen() {
-    const c = this.contentEl;
-    c.createEl("h2", { text: "Agreement types: " + this.record.file.basename });
-    c.createEl("p", { text: "Choose all that apply." });
-    for (const name of ["Maintenance", "Lease", "Software seats", "Other"]) {
-      const key = name.toLowerCase();
-      new Setting(c).setName(name).addToggle((t) =>
-        t
-          .setValue(
-            this.types.has(key) ||
-              (key === "software seats" &&
-                (this.types.has("seat") || this.types.has("software") || this.types.has("per-user"))),
-          )
-          .onChange((v) => {
-            if (v) this.types.add(key);
-            else {
-              this.types.delete(key);
-              if (key === "software seats") {
-                this.types.delete("seat");
-                this.types.delete("software");
-                this.types.delete("per-user");
-              }
-            }
-          }),
-      );
-    }
-    new Setting(c).addButton((b) =>
-      b
-        .setButtonText("Save agreement types")
-        .setCta()
-        .onClick(async () => {
-          try {
-            const values = [...this.types];
-            await this.app.fileManager.processFrontMatter(this.record.file, (fm) => {
-              fm.Agreement_Types = values;
-            });
-            this.record.fm.Agreement_Types = values;
-            this.close();
-            this.plugin.refresh();
-            new Notice("Agreement types saved");
-          } catch (e) {
-            new Notice("Could not save: " + e.message);
-          }
-        }),
-    );
   }
 }
 function omNextivaTypes(fm) {
@@ -1335,8 +1275,11 @@ function omTracksSeats(fm) {
     .map((v) => String(v).trim().toLowerCase())
     .filter(Boolean);
   if (omNextivaTypes(fm).length > 0) return true;
-  // Type: license means a per-seat license, unless it is a bundle still waiting for its license types.
-  if (!kinds.length && omNoteType(fm) === "license" && !Array.isArray(fm.License_Types)) return true;
+  // With a Type, the Type decides: licenses count seats (a bundle once its license types are added);
+  // services and contracts don't. Agreement_Types only matters for older notes without a Type.
+  const type = omNoteType(fm);
+  if (type === "license") return !Array.isArray(fm.License_Types);
+  if (type) return false;
   if (kinds.length)
     return kinds.some((v) =>
       ["software seats", "software seat", "seat", "seats", "software", "per-user", "per user"].includes(v),
@@ -2323,6 +2266,173 @@ function omEmployeeLicenseFields(plugin) {
   }
   return [...fields.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
+// Type label for a record: its Type property, or the closest match for older tag-based notes.
+function omTypeLabel(r) {
+  const type = omNoteType(r.fm || {});
+  if (type) return OM_TYPE_LABELS[type];
+  return { device: "Equipment", renewal: "License", invoice: "Bill", order: "Order", project: "Project" }[r.kind] ?? r.kind;
+}
+// Best guess at a Type for a note that has none, from its tags, folder and properties.
+function omSuggestType(file, fm, licenseFields) {
+  const tags = tagSet(fm);
+  const folders = file.path.split("/").slice(0, -1);
+  if (tags.has("employee")) return { type: "employee", why: "tag employee" };
+  if (folders.some((p) => /^employees?$/i.test(p))) return { type: "employee", why: "in an Employees folder" };
+  if (tags.has("equip_ug") || tags.has("equip_upgrade")) return { type: "computer", why: "tag equip_ug" };
+  const kind = classified(file, fm);
+  if (kind === "invoice")
+    return { type: "invoice", why: tags.has("invoice") ? "tag invoice" : "in an Invoices folder" };
+  if (kind === "order") return { type: "order", why: "tag order" };
+  if (kind === "device")
+    return tags.has("printer")
+      ? { type: "equipment", why: "tags device and printer" }
+      : { type: "computer", why: "tag device: change it for peripherals and office equipment" };
+  if (kind === "renewal") {
+    if (omNextivaTypes(fm).length || Array.isArray(fm.License_Types))
+      return { type: "license", why: "has License_Types (a license bundle)" };
+    const raw = fm.Agreement_Types ?? fm.Agreement_Type ?? fm.License_Type ?? [];
+    const kinds = (Array.isArray(raw) ? raw : String(raw).split(",")).map((v) => String(v).trim().toLowerCase());
+    if (omTracksSeats(fm)) return { type: "license", why: "counts seats" };
+    if (tags.has("printer") || kinds.some((k) => /lease|maintenance|agreement/.test(k)))
+      return { type: "contract", why: "lease or maintenance agreement" };
+    if (inferredRenewal(fm) || fm.Renewal_Term_Months != null)
+      return { type: "contract", why: "has a renewal date: change it to Service or License if needed" };
+    if (omBillingCycle(fm)) return { type: "service", why: "billed on a schedule with no renewal date" };
+    return { type: "license", why: "tag license: check it" };
+  }
+  const keys = new Set(Object.keys(fm).map((k) => k.toLowerCase()));
+  if (licenseFields.some((f) => keys.has(f.toLowerCase())))
+    return { type: "employee", why: "has license checkboxes" };
+  return null;
+}
+class OMAddTypeModal extends Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+    this.filter = "all";
+    const licenseFields = omEmployeeLicenseFields(plugin);
+    this.rows = [];
+    for (const file of app.vault.getMarkdownFiles()) {
+      if (file.path.split("/").slice(0, -1).some((p) => p.toLowerCase() === "templates")) continue;
+      const fm = app.metadataCache.getFileCache(file)?.frontmatter;
+      // Notes that already have a type property of any kind are left alone.
+      if (!fm || Object.keys(fm).some((k) => k.toLowerCase() === "type")) continue;
+      const guess = omSuggestType(file, fm, licenseFields);
+      if (guess) this.rows.push({ file, type: guess.type, why: guess.why, include: true });
+    }
+    const order = Object.keys(OM_TYPE_LABELS);
+    this.rows.sort(
+      (a, b) =>
+        order.indexOf(a.type) - order.indexOf(b.type) ||
+        a.file.basename.localeCompare(b.file.basename, undefined, { numeric: true, sensitivity: "base" }),
+    );
+  }
+  onOpen() {
+    this.modalEl.addClass("ops-add-type-modal");
+    this.render();
+  }
+  visible() {
+    return this.rows.filter((r) => this.filter === "all" || r.type === this.filter);
+  }
+  render() {
+    const c = this.contentEl;
+    c.empty();
+    c.createEl("h2", { text: "Add Type to existing notes" });
+    if (!this.rows.length) {
+      c.createEl("p", { text: "Every operations note already has a Type. Nothing to do." });
+      return;
+    }
+    c.createEl("p", {
+      cls: "setting-item-description",
+      text: "Check each suggestion, change any that are wrong, and untick notes you want to skip. Only a Type property is added; nothing else in the note changes. Notes that already have a Type are not listed.",
+    });
+    new Setting(c)
+      .setName("Show")
+      .addDropdown((d) => {
+        d.addOption("all", "All suggestions (" + this.rows.length + ")");
+        for (const [type, label] of Object.entries(OM_TYPE_LABELS)) {
+          const n = this.rows.filter((r) => r.type === type).length;
+          if (n) d.addOption(type, label + " (" + n + ")");
+        }
+        d.setValue(this.filter).onChange((v) => {
+          this.filter = v;
+          this.render();
+        });
+      })
+      .addButton((b) =>
+        b.setButtonText("Tick shown").onClick(() => {
+          for (const r of this.visible()) r.include = true;
+          this.render();
+        }),
+      )
+      .addButton((b) =>
+        b.setButtonText("Untick shown").onClick(() => {
+          for (const r of this.visible()) r.include = false;
+          this.render();
+        }),
+      );
+    const list = c.createDiv({ cls: "ops-add-type-list" });
+    for (const row of this.visible()) {
+      new Setting(list)
+        .setName(row.file.basename)
+        .setDesc(row.file.path + " · " + row.why)
+        .addDropdown((d) => {
+          for (const [type, label] of Object.entries(OM_TYPE_LABELS)) d.addOption(type, label);
+          d.setValue(row.type).onChange((v) => (row.type = v));
+        })
+        .addToggle((t) =>
+          t.setValue(row.include).onChange((v) => {
+            row.include = v;
+            this.updateCount();
+          }),
+        );
+    }
+    new Setting(c)
+      .addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()))
+      .addButton((b) => {
+        this.applyButton = b;
+        b.setCta().onClick(() => this.apply());
+      });
+    this.updateCount();
+  }
+  updateCount() {
+    const n = this.rows.filter((r) => r.include).length;
+    this.applyButton?.setButtonText("Add Type to " + n + (n === 1 ? " note" : " notes"));
+  }
+  async apply() {
+    const chosen = this.rows.filter((r) => r.include);
+    if (!chosen.length) {
+      new Notice("No notes ticked");
+      return;
+    }
+    let done = 0;
+    const failed = [];
+    for (const row of chosen) {
+      try {
+        await this.app.fileManager.processFrontMatter(row.file, (fm) => {
+          if (Object.keys(fm).some((k) => k.toLowerCase() === "type")) return;
+          // Put Type first, like new notes, keeping every other property as it was.
+          const rest = { ...fm };
+          for (const k of Object.keys(fm)) delete fm[k];
+          fm.Type = row.type;
+          Object.assign(fm, rest);
+        });
+        done++;
+      } catch (e) {
+        failed.push(row.file.basename);
+      }
+    }
+    new Notice(
+      "Added Type to " + done + (done === 1 ? " note" : " notes") +
+        (failed.length ? ". Could not update: " + failed.join(", ") : ""),
+    );
+    this.close();
+    this.plugin.refresh();
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+}
 class OMNewNoteModal extends Modal {
   constructor(app, plugin, templateId = "computer") {
     super(app);
@@ -2815,6 +2925,11 @@ module.exports = class OperationsManager extends Plugin {
       callback: () => this.activate(),
     });
     this.addCommand({
+      id: "add-type",
+      name: "Add Type to existing notes",
+      callback: () => new OMAddTypeModal(this.app, this).open(),
+    });
+    this.addCommand({
       id: "new-note",
       name: "Create a new operations note",
       callback: () => new OMNewNoteModal(this.app, this).open(),
@@ -3055,6 +3170,8 @@ module.exports = class OperationsManager extends Plugin {
       cls: "setting-item-description",
       text: "Give each note a Type property so the plugin knows what it is, then fill in the properties listed for that type. A lowercase type property works too, and notes that use tags (device, equip_ug, license, invoice, order) instead keep working.",
     });
+    const addType = section.createEl("button", { text: "Add Type to existing notes…" });
+    addType.onclick = () => new OMAddTypeModal(this.app, this).open();
     for (const t of OM_TEMPLATES) {
       const details = section.createEl("details", { cls: "ops-settings-license" });
       details.createEl("summary", { cls: "ops-settings-license-summary", text: t.label });
@@ -3150,15 +3267,15 @@ module.exports = class OperationsManager extends Plugin {
   }
   renderLicenseInventory(root, records) {
     const section = root.createDiv({ cls: "ops-settings-licenses" });
-    section.createEl("h3", { text: "Licenses & agreements" });
+    section.createEl("h3", { text: "Services, contracts & licenses" });
     section.createEl("p", {
       cls: "setting-item-description",
-      text: "Select a vendor to manage its alerts, billing, seats and assignments. Your existing notes remain the source of truth.",
+      text: "Select one to manage its alerts, billing, renewal date, seats and assignments. Your notes remain the source of truth.",
     });
     const toolbar = section.createDiv({ cls: "ops-settings-toolbar" });
     const search = toolbar.createEl("input", {
       type: "search",
-      placeholder: "Find a license or vendor…",
+      placeholder: "Find a service, contract or license…",
       cls: "ops-settings-search",
     });
     search.setAttribute("aria-label", "Search licenses");
@@ -3206,8 +3323,6 @@ module.exports = class OperationsManager extends Plugin {
         const actions = body.createDiv({ cls: "ops-settings-actions" });
         const open = actions.createEl("button", { text: "Open source note" });
         open.onclick = () => this.app.workspace.getLeaf(false).openFile(license.file);
-        const agreement = actions.createEl("button", { text: "Agreement types" });
-        agreement.onclick = () => new OMAgreementTypesModal(this.app, this, license).open();
         const alerts = body.createDiv({ cls: "ops-settings-group" });
         alerts.createEl("h4", { text: "Dashboard alerts" });
         alerts.createEl("p", {
@@ -3729,12 +3844,11 @@ module.exports = class OperationsManager extends Plugin {
         "Type",
         "Name",
         "Status",
-        "Order_Status",
         "Approved",
         "Vendor",
         "Employee",
-        "Serial_Number",
-        "Device_Model",
+        "Serial",
+        "Model",
         "Cost",
         "Ordered",
         "Set_Up",
@@ -3749,10 +3863,9 @@ module.exports = class OperationsManager extends Plugin {
       data = rows.map((r) => {
         const f = r.fm || {};
         return [
-          r.kind,
+          omTypeLabel(r),
           r.file.basename,
           f.Status ?? f.status ?? "",
-          f.Order_Status,
           f.Approved,
           f.Vendor,
           f.Employee ?? f.Assigned_To,

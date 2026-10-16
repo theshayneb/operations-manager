@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.91] - 2026-10-16
+
+- New command "Add Type to existing notes" (also a button in Settings → Note types & properties). It suggests a Type for every note that doesn't have one, from its tags, folder and properties, and shows why. Change any suggestion, untick notes to skip, then confirm. Only `Type` is added, at the top of each note; nothing else changes. Notes that already have a Type are left alone.
+- Removed the "Agreement types" button and dialog. A note's Type now decides everything: licenses count seats, services and contracts don't. `Agreement_Types` only matters for older notes without a Type.
+- The settings section is now called "Services, contracts & licenses".
+- Excel export: the Type column shows each note's Type, and the columns use the standard names `Serial` and `Model`. The old `Order_Status` column is gone.
+- Fixed: notes in a top-level `Invoices` folder weren't recognised as invoices.
+
 ## [0.4.90] - 2026-10-16
 
 - `Type: license` is enough to count seats: per-seat licenses no longer need `Agreement_Types: [software seats]`, and new license notes don't get it. Existing notes that have it keep working, and you can delete it from notes that have `Type: license`.

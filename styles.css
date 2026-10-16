@@ -96,3 +96,6 @@
 .ops-type-guide-table{width:100%;font-size:12px;border-collapse:collapse;margin:6px 0 10px}
 .ops-type-guide-table th,.ops-type-guide-table td{text-align:left;vertical-align:top;padding:4px 8px;border-bottom:1px solid var(--background-modifier-border)}
 .ops-type-guide-table td:first-child{font-family:var(--font-monospace);white-space:nowrap}
+.ops-add-type-modal{width:min(820px,95vw)}
+.ops-add-type-list{max-height:55vh;overflow-y:auto;border-top:1px solid var(--background-modifier-border);border-bottom:1px solid var(--background-modifier-border);margin:8px 0}
+.ops-add-type-list .setting-item-description{overflow-wrap:anywhere}

@@ -25,6 +25,6 @@ Give each note a `Type` property so the plugin knows what it is:
 | `order` | A purchase | Orders |
 | `employee` | A person, with one checkbox per license they hold | – |
 
-The **New note** button (or the "Create a new operations note" command) creates a note with the right properties for each type. **Settings → Note types & properties** lists them all. A lowercase `type` property works too, and notes that use tags instead keep working.
+The **New note** button (or the "Create a new operations note" command) creates a note with the right properties for each type. **Settings → Note types & properties** lists them all. A lowercase `type` property works too, and notes that use tags instead keep working. To add `Type` to the notes you already have, run the **Add Type to existing notes** command, check its suggestions, and confirm.
 
 **Status:** Experimental. Back up your vault before use. BRAT installation requires a published GitHub release with `main.js`, `manifest.json`, and `styles.css` attached.
