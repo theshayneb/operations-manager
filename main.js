@@ -218,7 +218,8 @@ const OM_TEMPLATES = [
       ["Model", "text", "Make and model."],
       ["Serial", "text", "Serial number."],
       ["Set_Up", "date", "Date it was set up for the employee."],
-      ["Notes", "text", "Anything else. [[Links]] are clickable on the cards."],
+      ["Notes", "text", "Anything else."],
+      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
       ["Ordered", "date", "Date it was ordered.", undefined, true],
     ],
   },
@@ -244,6 +245,7 @@ const OM_TEMPLATES = [
       ["Set_Up", "date", "Date it was set up for the employee."],
       ["Old_Device_Returned", "checkbox", "Ticked once the old computer is back.", false],
       ["Notes", "text", "Anything else."],
+      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
     ],
   },
   {
@@ -257,7 +259,8 @@ const OM_TEMPLATES = [
       ["Employee", "link", "Who has it, as a link: [[Jane Doe]]."],
       ["Model", "text", "Make and model."],
       ["Serial", "text", "Serial number, if it has one."],
-      ["Notes", "text", "e.g. Used with [[Laptop – Jane]]."],
+      ["Notes", "text", "Anything else."],
+      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
     ],
   },
   {
@@ -271,7 +274,8 @@ const OM_TEMPLATES = [
       ["Vendor", "text", "Who supplies or services it."],
       ["Model", "text", "Make and model."],
       ["Serial", "text", "Serial number."],
-      ["Notes", "text", "Location, and a link to its contract: [[Printer lease]]."],
+      ["Notes", "text", "Location, and anything else."],
+      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
     ],
   },
   {
@@ -300,7 +304,8 @@ const OM_TEMPLATES = [
         "Files such as signed forms or price sheets: drag them in, or add [[links]].",
         [],
       ],
-      ["Notes", "text", "Contacts, and a link to its contract: [[IT contract 2026]]."],
+      ["Notes", "text", "Contacts, and anything else."],
+      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
     ],
   },
   {
@@ -327,7 +332,8 @@ const OM_TEMPLATES = [
         true,
       ],
       ["Cost", "number", "Amount per billing cycle (or per term)."],
-      ["Notes", "text", "What it covers, as links: [[Office printer]] or [[Iron Mountain]]."],
+      ["Notes", "text", "What it covers, and anything else."],
+      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
       [
         "Billing",
         "text",
@@ -363,6 +369,7 @@ const OM_TEMPLATES = [
       ["Billing", "text", "Monthly, Quarterly, Semiannually or Annually.", "Monthly"],
       ["Next_Billing", "date", "Date of the next charge."],
       ["Next_Renewal", "date", "When the subscription renews, if it has a term."],
+      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
     ],
   },
   {
@@ -378,6 +385,7 @@ const OM_TEMPLATES = [
       ["Billing", "text", "Monthly, Quarterly, Semiannually or Annually.", "Monthly"],
       ["Next_Billing", "date", "Date of the next charge."],
       ["License_Types", "list", 'Filled in by "Manage license types".', []],
+      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
     ],
   },
   {
@@ -392,7 +400,8 @@ const OM_TEMPLATES = [
       ["Date", "date", "Invoice date."],
       ["Due_Date", "date", "Payment due date."],
       ["Cost", "number", "Amount."],
-      ["Notes", "text", 'What it is for, as links: [[Iron Mountain]]. Shown as "Services".'],
+      ["Notes", "text", 'What it is for. Shown as "Services".'],
+      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
       ["Paid_Date", "date", "Set by Mark paid.", undefined, true],
     ],
   },
@@ -409,6 +418,7 @@ const OM_TEMPLATES = [
       ["Ordered", "date", "Date it was ordered."],
       ["Employee", "link", "Who it is for, as a link: [[Jane Doe]]."],
       ["Notes", "text", "Anything else."],
+      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
     ],
   },
   {
@@ -1633,6 +1643,7 @@ class OperationsView extends ItemView {
             notes.createSpan({ text: "Services: " });
             omCardLinkedText(notes, r.fm.Notes, this.app, r.file.path);
           }
+          omRenderRelated(info, r.fm, this.app, r.file.path);
           if (!paid) {
             const btn = card.createEl("button", { cls: "ops-item-action", text: "Mark paid" });
             btn.onclick = () => new PaidModal(this.app, this.plugin, r.file).open();
@@ -1809,6 +1820,7 @@ class OperationsView extends ItemView {
           line.createSpan({ text: "Notes: " });
           omCardLinkedText(line, notes, this.app, r.file.path);
         }
+        omRenderRelated(info, r.fm, this.app, r.file.path);
         if (tagSet(r.fm).has("equip_ug") || tagSet(r.fm).has("equip_upgrade")) {
           const update = card.createEl("button", { cls: "ops-item-action", text: "Update" });
           update.onclick = () => new OMDeviceWorkflowModal(this.app, this.plugin, r).open();
@@ -2083,6 +2095,7 @@ class OperationsView extends ItemView {
             text: "Could not display license details: " + (error?.message || String(error)),
           });
         }
+        omRenderRelated(info, r.fm, this.app, r.file.path);
       }
       if (!dashboard)
         item.createSpan({
@@ -3187,6 +3200,14 @@ function omCardLinkedText(parent, value, app, sourcePath) {
     };
   }
 }
+// "Related:" line with the note's Related links, clickable.
+function omRenderRelated(info, fm, app, sourcePath) {
+  const related = fm.Related ?? fm.related;
+  if (!omFilled(related)) return;
+  const line = info.createDiv({ cls: "ops-equipment-note" });
+  line.createSpan({ text: "Related: " });
+  omCardLinkedText(line, related, app, sourcePath);
+}
 function omDashboardDeviceDetails(info, record, app, followUp) {
   const employee = record.fm.Employee ?? record.fm.Assigned_To;
   const hasEmployee = employee !== undefined && employee !== null && String(employee).trim() !== "";
@@ -3201,6 +3222,7 @@ function omDashboardDeviceDetails(info, record, app, followUp) {
     noteLine.createSpan({ text: "Notes: " });
     omCardLinkedText(noteLine, notes, app, record.file.path);
   }
+  omRenderRelated(info, record.fm, app, record.file.path);
 }
 const OM_CARD_ICONS = {
   renewal: "clock",
@@ -4130,6 +4152,7 @@ module.exports = class OperationsManager extends Plugin {
             line.createSpan({ text: "Notes: " });
             addLinkedText(line, note);
           }
+          omRenderRelated(info, r.fm, this.app, r.file.path);
           const replacing = r.fm.To_Replace;
           if (populated(replacing)) {
             const line = info.createDiv({ cls: "ops-equipment-replace" });

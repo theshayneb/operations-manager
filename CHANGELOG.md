@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.4.95] - 2026-10-16
+
+- New `Related` list property for links to connected notes, one link per item (e.g. a contract's `[[Office printer]]` and `[[Canon]]`). Cards on every tab show it as a "Related:" line with clickable links.
+- `Related` is part of every type except Employee: new notes start with an empty list, and "Check notes" offers to add it to existing notes. `Notes` is back to plain text for comments.
+
 ## [0.4.94] - 2026-10-16
 
 - Removed `Renewal_Term_Months`. Contracts use `Renewal`, the length of each term in days (e.g. 365), or `month-to-month` / `variable`. New contract notes get `Renewal: 365`, and the Renew button moves `Next_Renewal` forward by that many days.
