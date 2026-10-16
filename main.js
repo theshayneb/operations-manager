@@ -313,7 +313,19 @@ const OM_TEMPLATES = [
       [OM_STATUS, "text", "active, cancelled…", "active"],
       ["Vendor", "text", "Company name."],
       ["Next_Renewal", "date", "When it next renews or expires."],
-      ["Renewal_Term_Months", "number", "Length of each term, used by the Renew button.", 12],
+      [
+        "Renewal",
+        "number",
+        "Length of each term in days, e.g. 365 (or month-to-month, or variable). Renew moves Next_Renewal forward by this many days.",
+        365,
+      ],
+      [
+        "Ordered",
+        "date",
+        "Start date. With Renewal, gives an estimated renewal date while Next_Renewal is empty.",
+        undefined,
+        true,
+      ],
       ["Cost", "number", "Amount per billing cycle (or per term)."],
       ["Notes", "text", "What it covers, as links: [[Office printer]] or [[Iron Mountain]]."],
       [
@@ -476,10 +488,6 @@ function status(fm) {
   return String(fm.Status ?? fm.status ?? "")
     .trim()
     .toLowerCase();
-}
-function termMonths(fm) {
-  const x = Number(fm.Renewal_Term_Months);
-  return Number.isInteger(x) && x > 0 ? x : null;
 }
 
 function omLinkValue(v) {
@@ -2329,7 +2337,7 @@ function omSuggestType(file, fm, licenseFields) {
     if (omTracksSeats(fm)) return { type: "license", why: "counts seats" };
     if (tags.has("printer") || kinds.some((k) => /lease|maintenance|agreement/.test(k)))
       return { type: "contract", why: "lease or maintenance agreement" };
-    if (inferredRenewal(fm) || fm.Renewal_Term_Months != null)
+    if (inferredRenewal(fm) || fm.Renewal != null)
       return { type: "contract", why: "has a renewal date: change it to Service or License if needed" };
     if (omBillingCycle(fm)) return { type: "service", why: "billed on a schedule with no renewal date" };
     return { type: "license", why: "tag license: check it" };
@@ -2498,6 +2506,7 @@ const OM_LEGACY_PROPS = [
   "Seat_Alerts",
   "Agreement_Types",
   "Agreement_Type",
+  "Renewal_Term_Months",
 ];
 // The key the plugin actually reads for a property, in the order the readers try them
 // (Device_Model and Serial_Number win over Model and Serial).
@@ -2514,6 +2523,8 @@ function omFindKey(fm, name) {
 function omFilled(v) {
   return v !== undefined && v !== null && !(Array.isArray(v) && !v.length) && String(v).trim() !== "";
 }
+// Renewal terms that can't be advanced automatically.
+const OM_VARIABLE_TERM = /variable|manual|negotiat|tbd|unknown|custom/i;
 // One-off billing has no fixed amount or schedule: each use gets its own bill.
 const OM_NOT_FOR_ONE_OFF = ["Cost", "Next_Billing"];
 function omTemplateFor(file, fm) {
@@ -2551,7 +2562,10 @@ function omCheckNote(file, fm, licenseFields) {
     const v = fm[key];
     if (!omFilled(v)) continue;
     if (kind === "date" && !iso(v)) values.push(key + ' "' + v + "\" isn't a YYYY-MM-DD date");
-    if (kind === "number" && !Number.isFinite(Number(String(v).replace(/[$,\s]/g, ""))))
+    if (name === "Renewal") {
+      if (!/^\d+$/.test(String(v).trim()) && !omMonthToMonth(fm) && !OM_VARIABLE_TERM.test(String(v)))
+        values.push('Renewal "' + v + '" should be a number of days, month-to-month, or variable');
+    } else if (kind === "number" && !Number.isFinite(Number(String(v).replace(/[$,\s]/g, ""))))
       values.push(key + ' "' + v + "\" isn't a number");
     if (name === "Billing" && !omBillingCycle(fm))
       values.push('Billing "' + v + '" should be Monthly, Quarterly, Semiannually, Annually or One-off');
@@ -2760,6 +2774,10 @@ class OMCheckNotesModal extends Modal {
           await plugin.saveData(plugin.settings);
         }
         await this.app.fileManager.processFrontMatter(row.file, (fm) => {
+          // Renewal (days) replaces Renewal_Term_Months: carry a month count over as days.
+          const months = Number(fm.Renewal_Term_Months);
+          if (row.removeLegacy && Number.isInteger(months) && months > 0 && !omFilled(fm.Renewal))
+            fm.Renewal = Math.round((months * 365) / 12);
           if (row.addMissing)
             for (const m of row.missing)
               if (!Object.keys(fm).some((k) => k.toLowerCase() === m.name.toLowerCase()))
@@ -3036,9 +3054,8 @@ class RenewModal extends Modal {
       });
       return;
     }
-    const days = Number(this.fm.Renewal),
-      months = termMonths(this.fm);
-    const variable = /variable|manual|negotiat|tbd|unknown|custom/i.test(
+    const days = Number(this.fm.Renewal);
+    const variable = OM_VARIABLE_TERM.test(
       String(this.fm.Renewal ?? "") +
         " " +
         String(this.fm.Renewal_Term ?? "") +
@@ -3046,20 +3063,16 @@ class RenewModal extends Modal {
         String(this.fm.Renewal_Type ?? ""),
     );
     const fixedDays = Number.isInteger(days) && days > 0 && days <= 36500;
-    const fixedMonths = months != null;
-    if (variable || (!fixedDays && !fixedMonths)) {
+    if (variable || !fixedDays) {
       c.createEl("p", {
-        text: "Manual review required: renewal term is variable, missing, or not a positive number of days/months. No automatic date advancement will occur.",
+        text: "Manual review required: Renewal is variable, missing, or not a positive number of days. No automatic date advancement will occur.",
       });
       return;
     }
     const old = current.date;
-    let next;
-    if (fixedDays) {
-      const d = new Date(old + "T00:00:00Z");
-      d.setUTCDate(d.getUTCDate() + days);
-      next = dateISO(d);
-    } else next = addMonths(old, months);
+    const d = new Date(old + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + days);
+    const next = dateISO(d);
     c.createEl("p", { text: "Current renewal: " + old + (current.estimated ? " (estimated)" : "") });
     c.createEl("p", { text: "Next renewal after completion: " + next });
     c.createEl("p", {

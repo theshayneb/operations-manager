@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.94] - 2026-10-16
+
+- Removed `Renewal_Term_Months`. Contracts use `Renewal`, the length of each term in days (e.g. 365), or `month-to-month` / `variable`. New contract notes get `Renewal: 365`, and the Renew button moves `Next_Renewal` forward by that many days.
+- "Check notes" lists `Renewal_Term_Months` as an old property. Removing it from a note that has no `Renewal` turns the months into days (12 → 365). It also reports a `Renewal` that isn't a number of days, month-to-month or variable.
+- The settings guide lists `Ordered` as an optional contract property: with `Renewal`, it gives an estimated renewal date while `Next_Renewal` is empty.
+
 ## [0.4.93] - 2026-10-16
 
 - Notes with `Billing: One-off` don't need `Cost` or `Next_Billing`, since the amount varies each time and each use gets its own bill. "Check notes" no longer reports them as missing or empty, and new notes created with One-off billing leave them out.
