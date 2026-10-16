@@ -180,7 +180,7 @@ function daysUntil(d) {
     (Date.parse(d + "T00:00:00Z") - Date.parse(dateISO(new Date()) + "T00:00:00Z")) / 86400000,
   );
 }
-// Note types. A note's `type` property says what it is; tags keep working for notes without one.
+// Note types. A note's `Type` property (or lowercase `type`) says what it is; tags keep working for notes without one.
 // Each property: [name, kind, what to enter, default value for new notes]. Kinds: text, link, date,
 // number, checkbox, list. Properties marked optional are listed in the guide but not added to new notes.
 const OM_TYPE_ALIASES = {
@@ -376,7 +376,7 @@ const OM_TEMPLATES = [
   },
 ];
 function omNoteType(fm) {
-  const raw = String(fm?.type ?? fm?.Type ?? "")
+  const raw = String(fm?.Type ?? fm?.type ?? "")
     .trim()
     .toLowerCase()
     .replace(/[_-]+/g, " ");
@@ -2379,7 +2379,7 @@ class OMNewNoteModal extends Modal {
       new Notice("A note with that name already exists");
       return;
     }
-    const lines = ["type: " + t.type];
+    const lines = ["Type: " + t.type];
     if (t.tags) lines.push("tags:" + omYamlValue("list", t.tags));
     for (const [name, kind, , fallback, optional] of t.props) {
       if (optional) continue;
@@ -3039,7 +3039,7 @@ module.exports = class OperationsManager extends Plugin {
     section.createEl("h3", { text: "Note types & properties" });
     section.createEl("p", {
       cls: "setting-item-description",
-      text: "Give each note a type property so the plugin knows what it is, then fill in the properties listed for that type. Notes that use tags (device, equip_ug, license, invoice, order) instead of type keep working.",
+      text: "Give each note a Type property so the plugin knows what it is, then fill in the properties listed for that type. A lowercase type property works too, and notes that use tags (device, equip_ug, license, invoice, order) instead keep working.",
     });
     for (const t of OM_TEMPLATES) {
       const details = section.createEl("details", { cls: "ops-settings-license" });
@@ -3048,7 +3048,7 @@ module.exports = class OperationsManager extends Plugin {
       body.createEl("p", { cls: "setting-item-description", text: t.description });
       body.createEl("p", {
         cls: "ops-settings-facts",
-        text: "type: " + t.type + (t.tags ? " · tags: " + t.tags.join(", ") : ""),
+        text: "Type: " + t.type + (t.tags ? " · tags: " + t.tags.join(", ") : ""),
       });
       const table = body.createEl("table", { cls: "ops-type-guide-table" });
       const head = table.createEl("tr");

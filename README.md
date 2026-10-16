@@ -11,9 +11,9 @@ A beta Obsidian plugin for tracking equipment, licenses, renewals, and invoices 
 
 ## Note types
 
-Give each note a `type` property so the plugin knows what it is:
+Give each note a `Type` property so the plugin knows what it is:
 
-| type | For | Shows on |
+| Type | For | Shows on |
 |---|---|---|
 | `computer` | A laptop or desktop assigned to an employee. Add the `equip_ug` tag for replacements in that project. | Equipment |
 | `peripheral` | Mouse, keyboard, monitor, dock… | Equipment |
@@ -25,6 +25,6 @@ Give each note a `type` property so the plugin knows what it is:
 | `order` | A purchase | Orders |
 | `employee` | A person, with one checkbox per license they hold | – |
 
-The **New note** button (or the "Create a new operations note" command) creates a note with the right properties for each type. **Settings → Note types & properties** lists them all. Notes that use tags instead of `type` keep working.
+The **New note** button (or the "Create a new operations note" command) creates a note with the right properties for each type. **Settings → Note types & properties** lists them all. A lowercase `type` property works too, and notes that use tags instead keep working.
 
 **Status:** Experimental. Back up your vault before use. BRAT installation requires a published GitHub release with `main.js`, `manifest.json`, and `styles.css` attached.

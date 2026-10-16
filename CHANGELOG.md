@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.88] - 2026-10-16
+
+- New notes use a capitalized `Type` property, matching the other properties, and the settings guide shows `Type`. Notes with a lowercase `type` keep working.
+
 ## [0.4.87] - 2026-10-15
 
 ### Less clutter in your notes
