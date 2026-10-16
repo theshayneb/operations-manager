@@ -231,7 +231,11 @@ const OM_TEMPLATES = [
       'A new computer replacing an old one as part of the equip_ug project. The equip_ug tag groups these by phase on the Dashboard ("Equipment by Phase").',
     props: [
       [OM_STATUS, "text", "to do, ordered, delivered, complete…", "to do"],
-      ["Approved", "text", "Who approved it and the phase, e.g. Approved by Sam · Phase 2. The \"Phase …\" part is the group."],
+      [
+        "Approved",
+        "text",
+        'Who approved it and the phase, e.g. Approved by Sam · Phase 2. The "Phase …" part is the group.',
+      ],
       ["Employee", "link", "Who it is for, as a link: [[Jane Doe]]."],
       ["To_Replace", "link", "The old computer's note, as a link."],
       ["Model", "text", "Make and model."],
@@ -246,7 +250,8 @@ const OM_TEMPLATES = [
     id: "peripheral",
     type: "peripheral",
     label: "Peripheral",
-    description: "A mouse, keyboard, monitor, dock or headset assigned to an employee. Shows on the Equipment tab.",
+    description:
+      "A mouse, keyboard, monitor, dock or headset assigned to an employee. Shows on the Equipment tab.",
     props: [
       [OM_STATUS, "text", "deployed, spare, retired…", "deployed"],
       ["Employee", "link", "Who has it, as a link: [[Jane Doe]]."],
@@ -289,7 +294,12 @@ const OM_TEMPLATES = [
       ["Link", "text", "Website or customer portal."],
       ["Email", "text", "Contact or billing email address."],
       ["Account_Number", "text", "Your account number with the vendor."],
-      ["Attachments", "list", "Files such as signed forms or price sheets: drag them in, or add [[links]].", []],
+      [
+        "Attachments",
+        "list",
+        "Files such as signed forms or price sheets: drag them in, or add [[links]].",
+        [],
+      ],
       ["Notes", "text", "Contacts, and a link to its contract: [[IT contract 2026]]."],
     ],
   },
@@ -306,8 +316,20 @@ const OM_TEMPLATES = [
       ["Renewal_Term_Months", "number", "Length of each term, used by the Renew button.", 12],
       ["Cost", "number", "Amount per billing cycle (or per term)."],
       ["Notes", "text", "What it covers, as links: [[Office printer]] or [[Iron Mountain]]."],
-      ["Billing", "text", "Only if the contract itself is billed, e.g. a lease: Monthly, Quarterly…", undefined, true],
-      ["Next_Billing", "date", "Only if the contract itself is billed: date of the next charge.", undefined, true],
+      [
+        "Billing",
+        "text",
+        "Only if the contract itself is billed, e.g. a lease: Monthly, Quarterly…",
+        undefined,
+        true,
+      ],
+      [
+        "Next_Billing",
+        "date",
+        "Only if the contract itself is billed: date of the next charge.",
+        undefined,
+        true,
+      ],
     ],
   },
   {
@@ -320,7 +342,11 @@ const OM_TEMPLATES = [
       [OM_STATUS, "text", "active, cancelled…", "active"],
       ["Vendor", "text", "Company name."],
       ["License_Seats", "number", "Number of seats purchased."],
-      ["License_Field", "text", "Name of the checkbox property on employee notes. Defaults to the note's name."],
+      [
+        "License_Field",
+        "text",
+        "Name of the checkbox property on employee notes. Defaults to the note's name.",
+      ],
       ["Cost", "number", "Amount charged each billing cycle."],
       ["Billing", "text", "Monthly, Quarterly, Semiannually or Annually.", "Monthly"],
       ["Next_Billing", "date", "Date of the next charge."],
@@ -339,7 +365,7 @@ const OM_TEMPLATES = [
       ["Cost", "number", "Total amount charged each billing cycle."],
       ["Billing", "text", "Monthly, Quarterly, Semiannually or Annually.", "Monthly"],
       ["Next_Billing", "date", "Date of the next charge."],
-      ["License_Types", "list", "Filled in by \"Manage license types\".", []],
+      ["License_Types", "list", 'Filled in by "Manage license types".', []],
     ],
   },
   {
@@ -354,7 +380,7 @@ const OM_TEMPLATES = [
       ["Date", "date", "Invoice date."],
       ["Due_Date", "date", "Payment due date."],
       ["Cost", "number", "Amount."],
-      ["Notes", "text", "What it is for, as links: [[Iron Mountain]]. Shown as \"Services\"."],
+      ["Notes", "text", 'What it is for, as links: [[Iron Mountain]]. Shown as "Services".'],
       ["Paid_Date", "date", "Set by Mark paid.", undefined, true],
     ],
   },
@@ -362,7 +388,8 @@ const OM_TEMPLATES = [
     id: "order",
     type: "order",
     label: "Order",
-    description: "A purchase that is not part of the equip_ug project. Shows on the Orders tab until complete.",
+    description:
+      "A purchase that is not part of the equip_ug project. Shows on the Orders tab until complete.",
     props: [
       [OM_STATUS, "text", "to do, ordered, delivered, complete…", "to do"],
       ["Vendor", "text", "Who it was ordered from."],
@@ -379,7 +406,13 @@ const OM_TEMPLATES = [
     description:
       "A person. New employee notes get an unticked checkbox for every per-seat license and license-bundle type that uses a checkbox property; tick the ones they have.",
     props: [
-      ["Termination_Date", "date", "Fill in when they leave: their licenses stop being counted.", undefined, true],
+      [
+        "Termination_Date",
+        "date",
+        "Fill in when they leave: their licenses stop being counted.",
+        undefined,
+        true,
+      ],
     ],
   },
 ];
@@ -453,17 +486,10 @@ function omLinkValue(v) {
   if (v == null) return "";
   if (Array.isArray(v)) return omLinkValue(v[0]);
   if (typeof v === "object") return String(v.path ?? v.link ?? "");
-  return String(v)
-    .replace(/^\[\[/, "")
-    .replace(/\]\]$/, "")
-    .split("|")[0]
-    .trim();
+  return String(v).replace(/^\[\[/, "").replace(/\]\]$/, "").split("|")[0].trim();
 }
 function omKey(v) {
-  return omLinkValue(v)
-    .replace(/\\/g, "/")
-    .replace(/\.md$/i, "")
-    .toLowerCase();
+  return omLinkValue(v).replace(/\\/g, "/").replace(/\.md$/i, "").toLowerCase();
 }
 function omMatches(ref, file) {
   const k = omKey(ref);
@@ -1399,7 +1425,8 @@ function omDashboardAction(r, plugin) {
   if (r.kind === "renewal") {
     const renewal = omMonthToMonth(fm, r.file) ? null : inferredRenewal(fm);
     const renewalDays = renewal ? daysUntil(renewal.date) : null;
-    const renewalDue = omRenewalAlertsEnabled(fm, r.file) && !!omAlertColor(plugin, r.file, "renewal", renewalDays);
+    const renewalDue =
+      omRenewalAlertsEnabled(fm, r.file) && !!omAlertColor(plugin, r.file, "renewal", renewalDays);
     const billing = omBillingAlertsEnabled(fm, r.file) ? omBillingInfo(fm) : null;
     const billingDue = billing && !!omAlertColor(plugin, r.file, "billing", billing.days);
     const urgency = (d) => (d < 0 ? 0 : d <= 14 ? 10 : d <= 30 ? 30 : 45);
@@ -2270,14 +2297,19 @@ function omEmployeeLicenseFields(plugin) {
 function omTypeLabel(r) {
   const type = omNoteType(r.fm || {});
   if (type) return OM_TYPE_LABELS[type];
-  return { device: "Equipment", renewal: "License", invoice: "Bill", order: "Order", project: "Project" }[r.kind] ?? r.kind;
+  return (
+    { device: "Equipment", renewal: "License", invoice: "Bill", order: "Order", project: "Project" }[
+      r.kind
+    ] ?? r.kind
+  );
 }
 // Best guess at a Type for a note that has none, from its tags, folder and properties.
 function omSuggestType(file, fm, licenseFields) {
   const tags = tagSet(fm);
   const folders = file.path.split("/").slice(0, -1);
   if (tags.has("employee")) return { type: "employee", why: "tag employee" };
-  if (folders.some((p) => /^employees?$/i.test(p))) return { type: "employee", why: "in an Employees folder" };
+  if (folders.some((p) => /^employees?$/i.test(p)))
+    return { type: "employee", why: "in an Employees folder" };
   if (tags.has("equip_ug") || tags.has("equip_upgrade")) return { type: "computer", why: "tag equip_ug" };
   const kind = classified(file, fm);
   if (kind === "invoice")
@@ -2291,7 +2323,9 @@ function omSuggestType(file, fm, licenseFields) {
     if (omNextivaTypes(fm).length || Array.isArray(fm.License_Types))
       return { type: "license", why: "has License_Types (a license bundle)" };
     const raw = fm.Agreement_Types ?? fm.Agreement_Type ?? fm.License_Type ?? [];
-    const kinds = (Array.isArray(raw) ? raw : String(raw).split(",")).map((v) => String(v).trim().toLowerCase());
+    const kinds = (Array.isArray(raw) ? raw : String(raw).split(",")).map((v) =>
+      String(v).trim().toLowerCase(),
+    );
     if (omTracksSeats(fm)) return { type: "license", why: "counts seats" };
     if (tags.has("printer") || kinds.some((k) => /lease|maintenance|agreement/.test(k)))
       return { type: "contract", why: "lease or maintenance agreement" };
@@ -2313,7 +2347,13 @@ class OMAddTypeModal extends Modal {
     const licenseFields = omEmployeeLicenseFields(plugin);
     this.rows = [];
     for (const file of app.vault.getMarkdownFiles()) {
-      if (file.path.split("/").slice(0, -1).some((p) => p.toLowerCase() === "templates")) continue;
+      if (
+        file.path
+          .split("/")
+          .slice(0, -1)
+          .some((p) => p.toLowerCase() === "templates")
+      )
+        continue;
       const fm = app.metadataCache.getFileCache(file)?.frontmatter;
       // Notes that already have a type property of any kind are left alone.
       if (!fm || Object.keys(fm).some((k) => k.toLowerCase() === "type")) continue;
@@ -2423,11 +2463,323 @@ class OMAddTypeModal extends Modal {
       }
     }
     new Notice(
-      "Added Type to " + done + (done === 1 ? " note" : " notes") +
+      "Added Type to " +
+        done +
+        (done === 1 ? " note" : " notes") +
         (failed.length ? ". Could not update: " + failed.join(", ") : ""),
     );
     this.close();
     this.plugin.refresh();
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+// Older property names the plugin still reads in place of a template's name.
+const OM_PROP_ALIASES = {
+  Status: ["status"],
+  Model: ["Device_Model"],
+  Serial: ["Serial_Number"],
+  Employee: ["Assigned_To"],
+  Ordered: ["Order_Date"],
+  Set_Up: ["Set_up"],
+};
+// Properties earlier versions wrote that nothing reads any more (history and alert switches now
+// live in the plugin settings; a note's Type replaces Agreement_Types).
+const OM_LEGACY_PROPS = [
+  "Billing_History",
+  "Last_Billed",
+  "Renewal_History",
+  "Last_Renewed",
+  "Renewal_Review_Required",
+  "Order_Status",
+  "Renewal_Alerts",
+  "Billing_Alerts",
+  "Seat_Alerts",
+  "Agreement_Types",
+  "Agreement_Type",
+];
+// The key the plugin actually reads for a property, in the order the readers try them
+// (Device_Model and Serial_Number win over Model and Serial).
+function omFindKey(fm, name) {
+  const aliases = OM_PROP_ALIASES[name] || [];
+  const order = name === "Model" || name === "Serial" ? [...aliases, name] : [name, ...aliases];
+  const names = order.map((n) => n.toLowerCase());
+  for (const n of names) {
+    const key = Object.keys(fm).find((k) => k.toLowerCase() === n);
+    if (key) return key;
+  }
+  return null;
+}
+function omFilled(v) {
+  return v !== undefined && v !== null && !(Array.isArray(v) && !v.length) && String(v).trim() !== "";
+}
+function omTemplateFor(file, fm) {
+  const type = omNoteType(fm);
+  if (!type) return null;
+  const tags = tagSet(fm);
+  const id =
+    type === "computer" && (tags.has("equip_ug") || tags.has("equip_upgrade"))
+      ? "replacement"
+      : type === "license" && omIsBundle({ file, fm })
+        ? "bundle"
+        : type;
+  return OM_TEMPLATES.find((t) => t.id === id) ?? null;
+}
+// Everything worth knowing about one typed note: properties it is missing, values that are empty or
+// in the wrong format, and leftover properties from older versions.
+function omCheckNote(file, fm, licenseFields) {
+  const t = omTemplateFor(file, fm);
+  if (!t) return null;
+  const missing = [],
+    values = [],
+    legacy = [];
+  const get = (name) => {
+    const k = omFindKey(fm, name);
+    return k ? fm[k] : undefined;
+  };
+  for (const [name, kind, , fallback, optional] of t.props) {
+    const key = omFindKey(fm, name);
+    if (!key) {
+      if (!optional)
+        missing.push({ name, kind, value: kind === "checkbox" ? false : kind === "list" ? [] : null });
+      continue;
+    }
+    const v = fm[key];
+    if (!omFilled(v)) continue;
+    if (kind === "date" && !iso(v)) values.push(key + ' "' + v + "\" isn't a YYYY-MM-DD date");
+    if (kind === "number" && !Number.isFinite(Number(String(v).replace(/[$,\s]/g, ""))))
+      values.push(key + ' "' + v + "\" isn't a number");
+    if (name === "Billing" && !omBillingCycle(fm))
+      values.push('Billing "' + v + '" should be Monthly, Quarterly, Semiannually, Annually or One-off');
+  }
+  if (t.id === "employee" && !omTerminated(fm))
+    for (const field of licenseFields)
+      if (!Object.keys(fm).some((k) => k.toLowerCase() === field.toLowerCase()))
+        missing.push({ name: field, kind: "checkbox", value: false });
+  const needs = (name, why) => {
+    if (!omFilled(get(name))) values.push(name + " needs a value" + (why ? ": " + why : ""));
+  };
+  const cycle = omBillingCycle(fm);
+  if (["computer", "replacement", "peripheral", "equipment", "order"].includes(t.id)) needs("Status");
+  if (t.id === "replacement") needs("Approved", 'put the "Phase …" here so it is grouped');
+  if (t.id === "service") {
+    needs("Cost");
+    needs("Billing", "needed for charge alerts");
+    if (cycle && !cycle.oneOff) needs("Next_Billing", "needed for charge alerts");
+  }
+  if (t.id === "contract" && !inferredRenewal(fm)) needs("Next_Renewal", "needed for renewal alerts");
+  if (t.id === "license") needs("License_Seats", "needed to count seats");
+  if ((t.id === "license" || t.id === "bundle") && cycle && !cycle.oneOff)
+    needs("Next_Billing", "needed for charge alerts");
+  if (t.id === "bundle" && !omNextivaTypes(fm).length)
+    values.push('No license types yet: add them with "Manage license types"');
+  if (t.id === "invoice") {
+    needs("Date");
+    needs("Due_Date");
+    needs("Cost");
+  }
+  for (const name of OM_LEGACY_PROPS) {
+    const key = Object.keys(fm).find((k) => k.toLowerCase() === name.toLowerCase());
+    if (key) legacy.push(key);
+  }
+  if (Array.isArray(fm.Nextiva_Licenses) && !fm.Nextiva_Licenses.length) legacy.push("Nextiva_Licenses");
+  for (const [name, aliases] of Object.entries(OM_PROP_ALIASES)) {
+    const present = [name, ...aliases].filter((n) => Object.prototype.hasOwnProperty.call(fm, n));
+    if (present.length > 1)
+      values.push(
+        "Has both " +
+          present.join(" and ") +
+          "; " +
+          omFindKey(fm, name) +
+          " is the one used. Delete the other.",
+      );
+  }
+  return { file, fm, template: t, missing, values, legacy };
+}
+class OMCheckNotesModal extends Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+    this.filter = "all";
+    this.scan();
+  }
+  scan() {
+    const licenseFields = omEmployeeLicenseFields(this.plugin);
+    this.checked = 0;
+    this.rows = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      if (
+        file.path
+          .split("/")
+          .slice(0, -1)
+          .some((p) => p.toLowerCase() === "templates")
+      )
+        continue;
+      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+      if (!fm || ["archive", "archived"].includes(status(fm)) || tagSet(fm).has("archive")) continue;
+      const result = omCheckNote(file, fm, licenseFields);
+      if (!result) continue;
+      this.checked++;
+      if (result.missing.length || result.values.length || result.legacy.length)
+        this.rows.push({ ...result, addMissing: result.missing.length > 0, removeLegacy: false });
+    }
+    const order = OM_TEMPLATES.map((t) => t.id);
+    this.rows.sort(
+      (a, b) =>
+        order.indexOf(a.template.id) - order.indexOf(b.template.id) ||
+        a.file.basename.localeCompare(b.file.basename, undefined, { numeric: true, sensitivity: "base" }),
+    );
+  }
+  onOpen() {
+    this.modalEl.addClass("ops-add-type-modal");
+    this.render();
+  }
+  visible() {
+    return this.rows.filter((r) => this.filter === "all" || r.template.id === this.filter);
+  }
+  render() {
+    const c = this.contentEl;
+    c.empty();
+    c.createEl("h2", { text: "Check notes" });
+    const fine = this.checked - this.rows.length;
+    c.createEl("p", {
+      cls: "setting-item-description",
+      text:
+        this.checked +
+        " notes with a Type checked · " +
+        fine +
+        " have everything their type needs · " +
+        this.rows.length +
+        " listed below. Notes without a Type aren't checked: use Add Type to existing notes first.",
+    });
+    if (!this.rows.length) return;
+    c.createEl("p", {
+      cls: "setting-item-description",
+      text: "Adding missing properties adds them empty, for you to fill in. Values that are empty or in the wrong format have to be fixed in the note itself. Removing old properties moves any alert switch or charge and renewal history into the plugin settings first.",
+    });
+    new Setting(c)
+      .setName("Show")
+      .addDropdown((d) => {
+        d.addOption("all", "All (" + this.rows.length + ")");
+        for (const t of OM_TEMPLATES) {
+          const n = this.rows.filter((r) => r.template.id === t.id).length;
+          if (n) d.addOption(t.id, t.label + " (" + n + ")");
+        }
+        d.setValue(this.filter).onChange((v) => {
+          this.filter = v;
+          this.render();
+        });
+      })
+      .addButton((b) =>
+        b.setButtonText("Tick all old-property removals shown").onClick(() => {
+          for (const r of this.visible()) if (r.legacy.length) r.removeLegacy = true;
+          this.render();
+        }),
+      );
+    const list = c.createDiv({ cls: "ops-add-type-list ops-check-list" });
+    for (const row of this.visible()) {
+      const card = list.createDiv({ cls: "ops-check-note" });
+      const head = card.createDiv({ cls: "ops-item-head" });
+      const title = head.createEl("button", { cls: "ops-item-title", text: row.file.basename });
+      title.onclick = () => this.app.workspace.getLeaf(false).openFile(row.file);
+      head.createSpan({ cls: "ops-type-chip", text: row.template.label });
+      if (row.values.length) {
+        const ul = card.createEl("ul", { cls: "ops-check-issues" });
+        for (const v of row.values) ul.createEl("li", { text: v });
+      }
+      if (row.missing.length)
+        new Setting(card)
+          .setName("Add missing properties")
+          .setDesc(row.missing.map((m) => m.name).join(", "))
+          .addToggle((t) =>
+            t.setValue(row.addMissing).onChange((v) => {
+              row.addMissing = v;
+              this.updateCount();
+            }),
+          );
+      if (row.legacy.length)
+        new Setting(card)
+          .setName("Remove old properties")
+          .setDesc(row.legacy.join(", "))
+          .addToggle((t) =>
+            t.setValue(row.removeLegacy).onChange((v) => {
+              row.removeLegacy = v;
+              this.updateCount();
+            }),
+          );
+    }
+    new Setting(c)
+      .addButton((b) => b.setButtonText("Close").onClick(() => this.close()))
+      .addButton((b) => {
+        this.applyButton = b;
+        b.setCta().onClick(() => this.apply());
+      });
+    this.updateCount();
+  }
+  updateCount() {
+    const n = this.rows.filter(
+      (r) => (r.addMissing && r.missing.length) || (r.removeLegacy && r.legacy.length),
+    ).length;
+    this.applyButton?.setButtonText("Update " + n + (n === 1 ? " note" : " notes"));
+    this.applyButton?.setDisabled(n === 0);
+  }
+  async apply() {
+    const plugin = this.plugin;
+    const chosen = this.rows.filter(
+      (r) => (r.addMissing && r.missing.length) || (r.removeLegacy && r.legacy.length),
+    );
+    let done = 0;
+    const failed = [];
+    for (const row of chosen) {
+      try {
+        const path = row.file.path;
+        if (row.removeLegacy && row.legacy.length) {
+          // Keep alert choices and history before the note properties go.
+          const alerts = { ...(plugin.settings.licenseAlerts?.[path] || {}) };
+          for (const [kind, field] of [
+            ["renewal", "Renewal_Alerts"],
+            ["billing", "Billing_Alerts"],
+            ["seats", "Seat_Alerts"],
+          ])
+            if (typeof alerts[kind] !== "boolean" && row.legacy.includes(field))
+              alerts[kind] = omAlertSwitch(row.fm, null, kind, field);
+          if (Object.keys(alerts).length)
+            plugin.settings.licenseAlerts = { ...(plugin.settings.licenseAlerts || {}), [path]: alerts };
+          for (const [kind, field] of [
+            ["billing", "Billing_History"],
+            ["renewal", "Renewal_History"],
+          ]) {
+            const raw = row.fm[field];
+            for (const d of (Array.isArray(raw) ? raw : raw ? [raw] : []).map(iso).filter(Boolean))
+              await plugin.addHistory(row.file, kind, d);
+          }
+          await plugin.saveData(plugin.settings);
+        }
+        await this.app.fileManager.processFrontMatter(row.file, (fm) => {
+          if (row.addMissing)
+            for (const m of row.missing)
+              if (!Object.keys(fm).some((k) => k.toLowerCase() === m.name.toLowerCase()))
+                fm[m.name] = m.value;
+          if (row.removeLegacy) for (const key of row.legacy) delete fm[key];
+        });
+        done++;
+      } catch (e) {
+        failed.push(row.file.basename);
+      }
+    }
+    new Notice(
+      "Updated " +
+        done +
+        (done === 1 ? " note" : " notes") +
+        (failed.length ? ". Could not update: " + failed.join(", ") : ""),
+    );
+    plugin.refresh();
+    // Show what is left once Obsidian has re-read the notes.
+    window.setTimeout(() => {
+      this.scan();
+      this.render();
+    }, 500);
   }
   onClose() {
     this.contentEl.empty();
@@ -2470,7 +2822,8 @@ class OMNewNoteModal extends Modal {
     for (const [name, kind, help, , optional] of this.template.props) {
       if (optional || kind === "list") continue;
       const line = new Setting(c).setName(name).setDesc(help);
-      if (kind === "checkbox") line.addToggle((t) => t.setValue(false).onChange((v) => (this.values[name] = v)));
+      if (kind === "checkbox")
+        line.addToggle((t) => t.setValue(false).onChange((v) => (this.values[name] = v)));
       else
         line.addText((t) => {
           if (kind === "date") t.inputEl.type = "date";
@@ -2482,7 +2835,12 @@ class OMNewNoteModal extends Modal {
       cls: "setting-item-description",
       text: "Leave anything you don't know yet blank: the property is still added so you can fill it in later.",
     });
-    new Setting(c).addButton((b) => b.setButtonText("Create note").setCta().onClick(() => this.create()));
+    new Setting(c).addButton((b) =>
+      b
+        .setButtonText("Create note")
+        .setCta()
+        .onClick(() => this.create()),
+    );
   }
   async create() {
     const title = this.title.trim();
@@ -2497,7 +2855,9 @@ class OMNewNoteModal extends Modal {
         return;
       }
     const folder = normalizePath(this.folder || "/");
-    const path = normalizePath((folder === "/" ? "" : folder + "/") + title.replace(/[\\/:*?"<>|#^[\]]/g, "-") + ".md");
+    const path = normalizePath(
+      (folder === "/" ? "" : folder + "/") + title.replace(/[\\/:*?"<>|#^[\]]/g, "-") + ".md",
+    );
     if (this.app.vault.getAbstractFileByPath(path)) {
       new Notice("A note with that name already exists");
       return;
@@ -2522,7 +2882,10 @@ class OMNewNoteModal extends Modal {
       }
       const file = await this.app.vault.create(path, "---\n" + lines.join("\n") + "\n---\n");
       if ((this.plugin.settings.typeFolders?.[t.id] ?? this.plugin.settings.folder) !== this.folder) {
-        this.plugin.settings.typeFolders = { ...(this.plugin.settings.typeFolders || {}), [t.id]: this.folder };
+        this.plugin.settings.typeFolders = {
+          ...(this.plugin.settings.typeFolders || {}),
+          [t.id]: this.folder,
+        };
         await this.plugin.saveData(this.plugin.settings);
       }
       this.close();
@@ -2697,7 +3060,9 @@ class RenewModal extends Modal {
     c.createEl("p", {
       text:
         "This sets Next_Renewal in the note and keeps the completed date in the plugin's renewal history." +
-        (this.plugin.settings.renewalFollowUpTask ? " A follow-up task is added to the end of the note." : ""),
+        (this.plugin.settings.renewalFollowUpTask
+          ? " A follow-up task is added to the end of the note."
+          : ""),
     });
     new Setting(c).addButton((b) =>
       b
@@ -2925,6 +3290,11 @@ module.exports = class OperationsManager extends Plugin {
       callback: () => this.activate(),
     });
     this.addCommand({
+      id: "check-notes",
+      name: "Check notes for missing properties",
+      callback: () => new OMCheckNotesModal(this.app, this).open(),
+    });
+    this.addCommand({
       id: "add-type",
       name: "Add Type to existing notes",
       callback: () => new OMAddTypeModal(this.app, this).open(),
@@ -2943,7 +3313,9 @@ module.exports = class OperationsManager extends Plugin {
           this.containerEl.createEl("h3", { text: "General" });
           new Setting(this.containerEl)
             .setName("Folder for new records")
-            .setDesc("Where new notes are created, unless you pick a different folder for a type when creating one.")
+            .setDesc(
+              "Where new notes are created, unless you pick a different folder for a type when creating one.",
+            )
             .addText((t) =>
               t.setValue(this.plugin.settings.folder).onChange(async (v) => {
                 this.plugin.settings.folder = v;
@@ -3012,7 +3384,9 @@ module.exports = class OperationsManager extends Plugin {
     // written back to the note.
     const refreshSoon = require("obsidian").debounce(() => this.refresh(), 300, true);
     this.registerEvent(this.app.metadataCache.on("changed", () => refreshSoon()));
-    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.renameSettingsKeys(oldPath, file.path)));
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => this.renameSettingsKeys(oldPath, file.path)),
+    );
   }
   // Per-note settings (alert switches and rules, history, open sections) are keyed by file path,
   // so follow the note when it is renamed or moved.
@@ -3172,6 +3546,8 @@ module.exports = class OperationsManager extends Plugin {
     });
     const addType = section.createEl("button", { text: "Add Type to existing notes…" });
     addType.onclick = () => new OMAddTypeModal(this.app, this).open();
+    const check = section.createEl("button", { text: "Check notes for missing properties…" });
+    check.onclick = () => new OMCheckNotesModal(this.app, this).open();
     for (const t of OM_TEMPLATES) {
       const details = section.createEl("details", { cls: "ops-settings-license" });
       details.createEl("summary", { cls: "ops-settings-license-summary", text: t.label });
@@ -3249,8 +3625,7 @@ module.exports = class OperationsManager extends Plugin {
   licenseInventory(license) {
     const field = this.licenseField(license);
     const employees = this.employeeNotes().filter(
-      (e) =>
-        Object.keys(e.fm).some((k) => k.toLowerCase() === field.toLowerCase()) || omIsEmployee(e),
+      (e) => Object.keys(e.fm).some((k) => k.toLowerCase() === field.toLowerCase()) || omIsEmployee(e),
     );
     employees.sort((a, b) =>
       a.file.basename.localeCompare(b.file.basename, undefined, { sensitivity: "base", numeric: true }),

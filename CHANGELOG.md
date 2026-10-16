@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.92] - 2026-10-16
+
+- New command "Check notes for missing properties" (also a button in Settings → Note types & properties). For every note with a Type it lists:
+  - properties its type needs that the note doesn't have, which it can add (empty, for you to fill in; employees get an unticked checkbox for each license they're missing);
+  - values that need filling in for tracking to work (e.g. a service's `Next_Billing`, a contract's `Next_Renewal`), or that are in the wrong format (dates that aren't YYYY-MM-DD, costs that aren't numbers, unknown Billing values), or a note that has both `Model` and `Device_Model`;
+  - old properties nothing reads any more, which it can remove. Alert switches and charge/renewal history are moved into the plugin settings first.
+- Older names (`Device_Model`, `Serial_Number`, `Assigned_To`, `Order_Date`, `Set_up`) count as having the property, so they aren't reported as missing.
+
 ## [0.4.91] - 2026-10-16
 
 - New command "Add Type to existing notes" (also a button in Settings → Note types & properties). It suggests a Type for every note that doesn't have one, from its tags, folder and properties, and shows why. Change any suggestion, untick notes to skip, then confirm. Only `Type` is added, at the top of each note; nothing else changes. Notes that already have a Type are left alone.
