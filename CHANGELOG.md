@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.90] - 2026-10-16
+
+- `Type: license` is enough to count seats: per-seat licenses no longer need `Agreement_Types: [software seats]`, and new license notes don't get it. Existing notes that have it keep working, and you can delete it from notes that have `Type: license`.
+
 ## [0.4.89] - 2026-10-16
 
 - New service notes include `Link`, `Email`, `Account_Number` and `Attachments`.

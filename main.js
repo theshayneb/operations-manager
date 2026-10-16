@@ -319,7 +319,6 @@ const OM_TEMPLATES = [
     props: [
       [OM_STATUS, "text", "active, cancelled…", "active"],
       ["Vendor", "text", "Company name."],
-      ["Agreement_Types", "list", "Keep software seats so seats are counted.", ["software seats"]],
       ["License_Seats", "number", "Number of seats purchased."],
       ["License_Field", "text", "Name of the checkbox property on employee notes. Defaults to the note's name."],
       ["Cost", "number", "Amount charged each billing cycle."],
@@ -1336,6 +1335,8 @@ function omTracksSeats(fm) {
     .map((v) => String(v).trim().toLowerCase())
     .filter(Boolean);
   if (omNextivaTypes(fm).length > 0) return true;
+  // Type: license means a per-seat license, unless it is a bundle still waiting for its license types.
+  if (!kinds.length && omNoteType(fm) === "license" && !Array.isArray(fm.License_Types)) return true;
   if (kinds.length)
     return kinds.some((v) =>
       ["software seats", "software seat", "seat", "seats", "software", "per-user", "per user"].includes(v),
