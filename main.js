@@ -278,10 +278,19 @@ const OM_TEMPLATES = [
     props: [
       [OM_STATUS, "text", "active, cancelled…", "active"],
       ["Vendor", "text", "Company name."],
-      ["Cost", "number", "Amount charged each billing cycle."],
-      ["Billing", "text", "Monthly, Quarterly, Semiannually or Annually.", "Monthly"],
-      ["Next_Billing", "date", "Date of the next charge."],
-      ["Notes", "text", "Contacts, account number, and a link to its contract: [[IT contract 2026]]."],
+      ["Cost", "number", "Amount charged each billing cycle, or per use for One-off."],
+      [
+        "Billing",
+        "text",
+        "Monthly, Quarterly, Semiannually, Annually, or One-off for services that only charge when used.",
+        "Monthly",
+      ],
+      ["Next_Billing", "date", "Date of the next charge. Leave blank for One-off."],
+      ["Link", "text", "Website or customer portal."],
+      ["Email", "text", "Contact or billing email address."],
+      ["Account_Number", "text", "Your account number with the vendor."],
+      ["Attachments", "list", "Files such as signed forms or price sheets: drag them in, or add [[links]].", []],
+      ["Notes", "text", "Contacts, and a link to its contract: [[IT contract 2026]]."],
     ],
   },
   {
@@ -1377,6 +1386,9 @@ function omBillingCycle(fm) {
     biannually: 6,
     biannual: 6,
   };
+  // One-off services only charge when used, so they have no billing schedule or charge alerts.
+  if (/^(one[ -]?off|one[ -]?time|as[ -]needed|per[ -]use|on[ -]demand)$/.test(value))
+    return { months: 0, label: "One-off", oneOff: true };
   return Object.prototype.hasOwnProperty.call(months, value)
     ? { months: months[value], label: value.charAt(0).toUpperCase() + value.slice(1) }
     : null;
@@ -1384,7 +1396,7 @@ function omBillingCycle(fm) {
 function omBillingInfo(fm) {
   const cycle = omBillingCycle(fm);
   const date = iso(fm.Next_Billing);
-  if (!cycle || !date) return null;
+  if (!cycle || cycle.oneOff || !date) return null;
   return {
     date,
     days: daysUntil(date),
@@ -1397,7 +1409,7 @@ function omTermCost(fm) {
   const charge = omRenewalEstimate(fm),
     cycle = omBillingCycle(fm),
     term = Number(fm.Renewal);
-  if (!charge || !cycle || !Number.isInteger(term) || term <= 0 || term > 36500) return null;
+  if (!charge || !cycle || cycle.oneOff || !Number.isInteger(term) || term <= 0 || term > 36500) return null;
   const periods = Math.max(1, Math.round((term * 12) / (365.25 * cycle.months)));
   return { total: Math.round(charge.amount * periods * 100) / 100, periods };
 }
@@ -2434,9 +2446,10 @@ class OMBillingModal extends Modal {
         ["Quarterly", "Quarterly"],
         ["Semiannually", "Every 6 months"],
         ["Annually", "Annually"],
+        ["One-off", "One-off (only charged when used)"],
       ])
         d.addOption(value, label);
-      if (this.cycle && !["Monthly", "Quarterly", "Semiannually", "Annually"].includes(this.cycle))
+      if (this.cycle && !["Monthly", "Quarterly", "Semiannually", "Annually", "One-off"].includes(this.cycle))
         d.addOption(this.cycle, this.cycle);
       d.setValue(this.cycle).onChange((v) => (this.cycle = v));
     });

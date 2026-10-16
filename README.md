@@ -18,7 +18,7 @@ Give each note a `Type` property so the plugin knows what it is:
 | `computer` | A laptop or desktop assigned to an employee. Add the `equip_ug` tag for replacements in that project. | Equipment |
 | `peripheral` | Mouse, keyboard, monitor, dock… | Equipment |
 | `equipment` | Printers, postage machines | Equipment |
-| `service` | Off-site storage, shredding, IT company | Licenses & Renewals |
+| `service` | Off-site storage, shredding, IT company. Billing can be One-off for pay-per-use services. | Licenses & Renewals |
 | `contract` | A lease or yearly agreement with a renewal date | Licenses & Renewals |
 | `license` | Per-seat software, or a bundle of license types making up one bill | Licenses & Renewals |
 | `invoice` | A bill | Invoices |

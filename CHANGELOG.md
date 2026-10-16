@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.4.89] - 2026-10-16
+
+- New service notes include `Link`, `Email`, `Account_Number` and `Attachments`.
+- `Billing` can be `One-off` for services that only charge when you use them. One-off services have no billing schedule, so they never raise a charge alert. "Edit billing schedule" offers One-off too.
+
 ## [0.4.88] - 2026-10-16
 
 - New notes use a capitalized `Type` property, matching the other properties, and the settings guide shows `Type`. Notes with a lowercase `type` keep working.
