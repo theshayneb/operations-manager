@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.93] - 2026-10-16
+
+- Notes with `Billing: One-off` don't need `Cost` or `Next_Billing`, since the amount varies each time and each use gets its own bill. "Check notes" no longer reports them as missing or empty, and new notes created with One-off billing leave them out.
+
 ## [0.4.92] - 2026-10-16
 
 - New command "Check notes for missing properties" (also a button in Settings → Note types & properties). For every note with a Type it lists:

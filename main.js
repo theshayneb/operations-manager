@@ -283,7 +283,7 @@ const OM_TEMPLATES = [
     props: [
       [OM_STATUS, "text", "active, cancelled…", "active"],
       ["Vendor", "text", "Company name."],
-      ["Cost", "number", "Amount charged each billing cycle, or per use for One-off."],
+      ["Cost", "number", "Amount charged each billing cycle. Not needed for One-off: each bill has its own amount."],
       [
         "Billing",
         "text",
@@ -2514,6 +2514,8 @@ function omFindKey(fm, name) {
 function omFilled(v) {
   return v !== undefined && v !== null && !(Array.isArray(v) && !v.length) && String(v).trim() !== "";
 }
+// One-off billing has no fixed amount or schedule: each use gets its own bill.
+const OM_NOT_FOR_ONE_OFF = ["Cost", "Next_Billing"];
 function omTemplateFor(file, fm) {
   const type = omNoteType(fm);
   if (!type) return null;
@@ -2531,6 +2533,7 @@ function omTemplateFor(file, fm) {
 function omCheckNote(file, fm, licenseFields) {
   const t = omTemplateFor(file, fm);
   if (!t) return null;
+  const oneOff = !!omBillingCycle(fm)?.oneOff;
   const missing = [],
     values = [],
     legacy = [];
@@ -2541,7 +2544,7 @@ function omCheckNote(file, fm, licenseFields) {
   for (const [name, kind, , fallback, optional] of t.props) {
     const key = omFindKey(fm, name);
     if (!key) {
-      if (!optional)
+      if (!optional && !(oneOff && OM_NOT_FOR_ONE_OFF.includes(name)))
         missing.push({ name, kind, value: kind === "checkbox" ? false : kind === "list" ? [] : null });
       continue;
     }
@@ -2564,7 +2567,7 @@ function omCheckNote(file, fm, licenseFields) {
   if (["computer", "replacement", "peripheral", "equipment", "order"].includes(t.id)) needs("Status");
   if (t.id === "replacement") needs("Approved", 'put the "Phase …" here so it is grouped');
   if (t.id === "service") {
-    needs("Cost");
+    if (!oneOff) needs("Cost");
     needs("Billing", "needed for charge alerts");
     if (cycle && !cycle.oneOff) needs("Next_Billing", "needed for charge alerts");
   }
@@ -2866,6 +2869,8 @@ class OMNewNoteModal extends Modal {
     if (t.tags) lines.push("tags:" + omYamlValue("list", t.tags));
     for (const [name, kind, , fallback, optional] of t.props) {
       if (optional) continue;
+      const billing = this.values.Billing ?? t.props.find((p) => p[0] === "Billing")?.[3];
+      if (OM_NOT_FOR_ONE_OFF.includes(name) && omBillingCycle({ Billing: billing })?.oneOff) continue;
       let value = this.values[name] ?? fallback;
       if (name === "License_Field" && !value) value = title;
       lines.push(name + ":" + omYamlValue(kind, value));
