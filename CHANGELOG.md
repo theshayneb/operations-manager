@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.97] - 2026-10-27
+
+- The Refresh, New note and Export Excel buttons are back on the right-hand side of the dashboard.
+
 ## [0.4.96] - 2026-10-27
 
 - Removed the "Operations Command Center" heading and "Your operations at a glance" line from the top of the dashboard to save space. The Refresh, New note and Export Excel buttons stay, with the tabs right below them.
