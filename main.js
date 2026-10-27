@@ -1836,7 +1836,9 @@ class OperationsView extends ItemView {
     root.empty();
     root.addClass("ops-command");
     const rows = this.plugin.records();
-    const nav = root.createDiv({ cls: "ops-header" });
+    // Tabs on the left and the action buttons on the right share one row.
+    const nav = root.createDiv({ cls: "ops-header ops-topbar" });
+    const tabs = nav.createDiv({ cls: "ops-tabs" });
     const actions = nav.createDiv({ cls: "ops-actions" });
     for (const [name, fn] of [
       ["Refresh", () => this.render()],
@@ -1846,7 +1848,6 @@ class OperationsView extends ItemView {
       const btn = actions.createEl("button", { text: name });
       btn.onclick = fn;
     }
-    const tabs = root.createDiv({ cls: "ops-tabs" });
     const pages = [
       ["Dashboard", "dashboard"],
       ["Equipment", "device"],

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.98] - 2026-10-27
+
+- The Refresh, New note and Export Excel buttons now sit on the same row as the tabs (tabs on the left, buttons on the right), removing the gap above the tabs. On narrow panes the buttons move just above the tabs.
+
 ## [0.4.97] - 2026-10-27
 
 - The Refresh, New note and Export Excel buttons are back on the right-hand side of the dashboard.
