@@ -2162,6 +2162,18 @@ class OperationsView extends ItemView {
         const info = card.createDiv({ cls: "ops-item-info" });
         const btn = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
         btn.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
+        if (classified(r.file, r.fm) === "invoice") {
+          // Show how old a follow-up invoice is.
+          const dated = iso(r.fm.Date),
+            due = iso(r.fm.Due_Date);
+          const age = dated ? -daysUntil(dated) : null;
+          info.createEl("small", {
+            text:
+              (dated
+                ? "Invoice date " + dated + " · " + (age === 0 ? "today" : age === 1 ? "1 day old" : age + " days old")
+                : "Invoice date not set") + (due ? " · Due " + due : ""),
+          });
+        }
         omDashboardDeviceDetails(info, r, this.app, true);
         if (omIsDeviceNote(r.fm)) {
           const update = card.createEl("button", { text: "Update", cls: "ops-item-action" });

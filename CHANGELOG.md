@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.99] - 2026-10-27
+
+- Invoices marked "follow up" show their invoice date and age on the Dashboard card (e.g. "Invoice date 2026-09-01 · 56 days old · Due 2026-09-15"), so you can see how long they've been waiting.
+
 ## [0.4.98] - 2026-10-27
 
 - The Refresh, New note and Export Excel buttons now sit on the same row as the tabs (tabs on the left, buttons on the right), removing the gap above the tabs. On narrow panes the buttons move just above the tabs.
