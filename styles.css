@@ -103,3 +103,5 @@
 .ops-check-note:last-child{border-bottom:0}
 .ops-check-note .setting-item{padding:6px 0;border:0}
 .ops-check-issues{margin:6px 0;padding-left:20px;font-size:12px;color:var(--text-muted)}
+/* The header holds only the action buttons, so keep the tabs close to them. */
+.ops-command .ops-tabs{margin-top:12px}

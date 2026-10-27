@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.96] - 2026-10-27
+
+- Removed the "Operations Command Center" heading and "Your operations at a glance" line from the top of the dashboard to save space. The Refresh, New note and Export Excel buttons stay, with the tabs right below them.
+
 ## [0.4.95] - 2026-10-16
 
 - New `Related` list property for links to connected notes, one link per item (e.g. a contract's `[[Office printer]]` and `[[Canon]]`). Cards on every tab show it as a "Related:" line with clickable links.

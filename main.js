@@ -1837,9 +1837,6 @@ class OperationsView extends ItemView {
     root.addClass("ops-command");
     const rows = this.plugin.records();
     const nav = root.createDiv({ cls: "ops-header" });
-    const title = nav.createDiv();
-    title.createEl("h2", { text: "Operations Command Center" });
-    title.createEl("small", { text: "Your operations at a glance" });
     const actions = nav.createDiv({ cls: "ops-actions" });
     for (const [name, fn] of [
       ["Refresh", () => this.render()],
