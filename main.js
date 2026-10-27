@@ -157,7 +157,11 @@ function omLicenseAssigned(value) {
 }
 function iso(v) {
   if (v instanceof Date) return dateISO(v);
-  if (typeof v === "string") return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+  // Date & time properties are stored as e.g. 2026-10-23T00:00; only the date part matters here.
+  if (typeof v === "string") {
+    const m = v.trim().match(/^(\d{4}-\d{2}-\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/);
+    return m ? m[1] : null;
+  }
   return null;
 }
 function omMonthToMonth(fm, file) {
@@ -1635,7 +1639,7 @@ class OperationsView extends ItemView {
           const title = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
           title.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
           info.createEl("small", {
-            text: "Date: " + (r.fm.Date ?? "Not set") + " · Vendor: " + (r.fm.Vendor ?? "Not set"),
+            text: "Date: " + (iso(r.fm.Date) ?? r.fm.Date ?? "Not set") + " · Vendor: " + (r.fm.Vendor ?? "Not set"),
           });
           info.createEl("small", { text: r.reason || "" });
           if (r.fm.Notes !== undefined && r.fm.Notes !== null && String(r.fm.Notes).trim()) {

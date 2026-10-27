@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.100] - 2026-10-27
+
+- Fixed: dates in "Date & time" properties (stored as e.g. `2026-10-23T00:00`) weren't recognised, so a follow-up invoice said "Invoice date not set". All dates the plugin reads (Date, Due_Date, Next_Billing, Next_Renewal, Ordered, Set_Up…) now accept a date with or without a time, and "Check notes" no longer reports them as wrong.
+
 ## [0.4.99] - 2026-10-27
 
 - Invoices marked "follow up" show their invoice date and age on the Dashboard card (e.g. "Invoice date 2026-09-01 · 56 days old · Due 2026-09-15"), so you can see how long they've been waiting.
