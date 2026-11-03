@@ -1548,10 +1548,24 @@ function omDashboardDisplayColor(plugin, r) {
     const colors = omLicenseActiveAlerts(plugin, r).map((a) => a.color);
     return ["red", "orange", "yellow", "green"].find((c) => colors.includes(c)) ?? null;
   }
-  const due = r.kind === "invoice" ? iso(r.fm.Due_Date) : null;
-  const days = due ? daysUntil(due) : null;
-  const stale = r.kind === "invoice" && r.attention && iso(r.fm.Date) && daysUntil(iso(r.fm.Date)) < -7;
-  return stale || (days !== null && days <= 30) ? "red" : days !== null && days <= 60 ? "orange" : null;
+  if (r.kind === "invoice") return r.attention ? omInvoiceAgeColor(r.fm) : null;
+  return null;
+}
+// Unpaid invoices by age: yellow from 7 days, orange from 14, red from 21. Age counts from the
+// invoice Date, or from Due_Date when there is no Date.
+function omInvoiceAge(fm) {
+  const from = iso(fm.Date) ?? iso(fm.Due_Date);
+  return from ? -daysUntil(from) : null;
+}
+function omInvoiceAgeColor(fm) {
+  const age = omInvoiceAge(fm);
+  if (age === null) return null;
+  return age >= 21 ? "red" : age >= 14 ? "orange" : age >= 7 ? "yellow" : null;
+}
+function omInvoicePaid(fm) {
+  return (
+    ["paid", "complete", "completed"].includes(status(fm)) || fm.Paid === true || !!iso(fm.Payment_Date ?? fm.Paid_Date)
+  );
 }
 function omDashboardSortDate(plugin, r) {
   if (r.kind === "renewal")
@@ -1561,7 +1575,7 @@ function omDashboardSortDate(plugin, r) {
         .map((a) => a.date)
         .sort()[0] ?? "9999-12-31"
     );
-  return iso(r.fm.Due_Date) ?? iso(r.fm.Date) ?? "9999-12-31";
+  return iso(r.fm.Date) ?? iso(r.fm.Due_Date) ?? "9999-12-31";
 }
 class OperationsView extends ItemView {
   constructor(leaf, plugin) {
@@ -2058,6 +2072,10 @@ class OperationsView extends ItemView {
     for (const { r, seat } of entries) {
       const color = dashboard ? omDashboardDisplayColor(this.plugin, r) : null;
       const item = list.createDiv({ cls: "ops-attention-item" + (color ? " ops-alert-" + color : "") });
+      if (dashboard) {
+        item.dataset.omRank = String(color ? { red: 0, orange: 1, yellow: 2, green: 3 }[color] : 4);
+        item.dataset.omSort = omDashboardSortDate(this.plugin, r);
+      }
       const icon = this.plugin.renderCardIcon(item, r.kind);
       const info = item.createDiv({ cls: "ops-item-info" });
       omCardTitle(info, r, this.app);
@@ -2157,11 +2175,24 @@ class OperationsView extends ItemView {
               tagSet(x.fm).has("follow-up")) &&
             !existing.has(x.file.path),
         )
-        .sort((a, b) =>
-          a.file.basename.localeCompare(b.file.basename, undefined, { numeric: true, sensitivity: "base" }),
-        );
+        .map((x) => ({
+          ...x,
+          color:
+            classified(x.file, x.fm) === "invoice" && !omInvoicePaid(x.fm) ? omInvoiceAgeColor(x.fm) : null,
+        }))
+        // Same order as the cards above: red, orange, yellow, then the rest; oldest first within a color.
+        .sort((a, b) => {
+          const rank = { red: 0, orange: 1, yellow: 2 };
+          return (
+            (rank[a.color] ?? 3) - (rank[b.color] ?? 3) ||
+            (a.color ? (omInvoiceAge(b.fm) ?? 0) - (omInvoiceAge(a.fm) ?? 0) : 0) ||
+            a.file.basename.localeCompare(b.file.basename, undefined, { numeric: true, sensitivity: "base" })
+          );
+        });
       for (const r of followups) {
-        const card = list.createDiv({ cls: "ops-attention-item" });
+        const card = list.createDiv({ cls: "ops-attention-item" + (r.color ? " ops-alert-" + r.color : "") });
+        card.dataset.omRank = String(r.color ? { red: 0, orange: 1, yellow: 2, green: 3 }[r.color] : 5);
+        card.dataset.omSort = r.color ? (iso(r.fm.Date) ?? iso(r.fm.Due_Date) ?? "9999-12-31") : "";
         this.plugin.renderCardIcon(card, "followup");
         const info = card.createDiv({ cls: "ops-item-info" });
         const btn = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
@@ -2185,6 +2216,16 @@ class OperationsView extends ItemView {
             new OMDeviceWorkflowModal(this.app, this.plugin, { ...r, kind: "device" }).open();
         }
       }
+      // One list: red, orange, yellow cards first (follow-ups included), oldest first within a color,
+      // then other action items, then the remaining follow-ups. Sort is stable, so ties keep their order.
+      const cards = [...list.children].filter((el) => el.dataset?.omRank !== undefined);
+      cards
+        .sort(
+          (a, b) =>
+            Number(a.dataset.omRank) - Number(b.dataset.omRank) ||
+            (Number(a.dataset.omRank) < 4 ? a.dataset.omSort.localeCompare(b.dataset.omSort) : 0),
+        )
+        .forEach((el) => list.appendChild(el));
     }
     if (this.page === "dashboard") {
       const upgrades = this.app.vault

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.4.101] - 2026-11-03
+
+- Unpaid invoices on the Dashboard are coloured by age: yellow from 7 days old, orange from 14, red from 21 (counted from the invoice `Date`, or from `Due_Date` if there's no Date). This includes invoices marked "follow up".
+- The whole Dashboard list is sorted the same way: red cards first, then orange, then yellow (oldest first within each colour), then everything else. Follow-up invoices now take their place in that order instead of always sitting at the bottom.
+
 ## [0.4.100] - 2026-10-27
 
 - Fixed: dates in "Date & time" properties (stored as e.g. `2026-10-23T00:00`) weren't recognised, so a follow-up invoice said "Invoice date not set". All dates the plugin reads (Date, Due_Date, Next_Billing, Next_Renewal, Ordered, Set_Up…) now accept a date with or without a time, and "Check notes" no longer reports them as wrong.
