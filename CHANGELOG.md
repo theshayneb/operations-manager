@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.103] - 2026-11-10
+
+- Equipment by Age now only shows notes with `Type: computer` (peripherals, office equipment and tag-only notes are left out). Retired computers stay hidden. Group by Status still shows everything.
+
 ## [0.4.102] - 2026-11-10
 
 - Equipment tab: new "Group by" option, Status (as before) or Age. The choice is remembered.

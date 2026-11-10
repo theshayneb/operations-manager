@@ -4228,7 +4228,8 @@ module.exports = class OperationsManager extends Plugin {
       const groups = new Map();
       if (groupBy === "age") {
         for (const r of records) {
-          if (status(r.fm) === "retired") continue;
+          // Only computers are replaced on the 4-year cycle.
+          if (omNoteType(r.fm) !== "computer" || status(r.fm) === "retired") continue;
           const key = ageKey(r);
           if (!groups.has(key)) groups.set(key, []);
           groups.get(key).push(r);
