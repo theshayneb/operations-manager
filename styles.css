@@ -107,3 +107,8 @@
 .ops-command .ops-topbar{align-items:center;flex-wrap:wrap-reverse;gap:8px 14px;margin-bottom:18px;border-bottom:1px solid var(--background-modifier-border)}
 .ops-command .ops-topbar .ops-tabs{flex:1 1 auto;min-width:0;margin:0;border-bottom:0}
 .ops-command .ops-topbar .ops-actions{flex:0 0 auto;margin-left:auto;padding-bottom:6px}
+/* Equipment by Age: devices due for replacement (4 years) and overdue (5+ years). */
+.ops-equipment-phase.ops-age-due{border-left:4px solid #ffae52}
+.ops-equipment-phase.ops-age-due>summary{color:#ffae52}
+.ops-equipment-phase.ops-age-overdue{border-left:4px solid #fd5858}
+.ops-equipment-phase.ops-age-overdue>summary{color:#fd5858}

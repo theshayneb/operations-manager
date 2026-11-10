@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.102] - 2026-11-10
+
+- Equipment tab: new "Group by" option, Status (as before) or Age. The choice is remembered.
+- Age groups by the year in `Ordered` (or `Order_Date`), not the exact date: a red "5+ years old · overdue" card first, then an orange "4 years old · replace this year" card (both open by default), then 3, 2 and 1 years old, less than 1 year, and "No Ordered date". Empty years are left out.
+- Covers every note on the Equipment tab (computers, peripherals, office equipment); devices with Status "retired" are hidden. Cards in the Age view show the Ordered date and model.
+
 ## [0.4.101] - 2026-11-03
 
 - Unpaid invoices on the Dashboard are coloured by age: yellow from 7 days old, orange from 14, red from 21 (counted from the invoice `Date`, or from `Due_Date` if there's no Date). This includes invoices marked "follow up".

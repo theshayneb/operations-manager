@@ -159,7 +159,9 @@ function iso(v) {
   if (v instanceof Date) return dateISO(v);
   // Date & time properties are stored as e.g. 2026-10-23T00:00; only the date part matters here.
   if (typeof v === "string") {
-    const m = v.trim().match(/^(\d{4}-\d{2}-\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/);
+    const m = v
+      .trim()
+      .match(/^(\d{4}-\d{2}-\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/);
     return m ? m[1] : null;
   }
   return null;
@@ -223,7 +225,12 @@ const OM_TEMPLATES = [
       ["Serial", "text", "Serial number."],
       ["Set_Up", "date", "Date it was set up for the employee."],
       ["Notes", "text", "Anything else."],
-      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
+      [
+        "Related",
+        "list",
+        "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…",
+        [],
+      ],
       ["Ordered", "date", "Date it was ordered.", undefined, true],
     ],
   },
@@ -249,7 +256,12 @@ const OM_TEMPLATES = [
       ["Set_Up", "date", "Date it was set up for the employee."],
       ["Old_Device_Returned", "checkbox", "Ticked once the old computer is back.", false],
       ["Notes", "text", "Anything else."],
-      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
+      [
+        "Related",
+        "list",
+        "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…",
+        [],
+      ],
     ],
   },
   {
@@ -264,7 +276,12 @@ const OM_TEMPLATES = [
       ["Model", "text", "Make and model."],
       ["Serial", "text", "Serial number, if it has one."],
       ["Notes", "text", "Anything else."],
-      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
+      [
+        "Related",
+        "list",
+        "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…",
+        [],
+      ],
     ],
   },
   {
@@ -279,7 +296,12 @@ const OM_TEMPLATES = [
       ["Model", "text", "Make and model."],
       ["Serial", "text", "Serial number."],
       ["Notes", "text", "Location, and anything else."],
-      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
+      [
+        "Related",
+        "list",
+        "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…",
+        [],
+      ],
     ],
   },
   {
@@ -291,7 +313,11 @@ const OM_TEMPLATES = [
     props: [
       [OM_STATUS, "text", "active, cancelled…", "active"],
       ["Vendor", "text", "Company name."],
-      ["Cost", "number", "Amount charged each billing cycle. Not needed for One-off: each bill has its own amount."],
+      [
+        "Cost",
+        "number",
+        "Amount charged each billing cycle. Not needed for One-off: each bill has its own amount.",
+      ],
       [
         "Billing",
         "text",
@@ -309,7 +335,12 @@ const OM_TEMPLATES = [
         [],
       ],
       ["Notes", "text", "Contacts, and anything else."],
-      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
+      [
+        "Related",
+        "list",
+        "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…",
+        [],
+      ],
     ],
   },
   {
@@ -337,7 +368,12 @@ const OM_TEMPLATES = [
       ],
       ["Cost", "number", "Amount per billing cycle (or per term)."],
       ["Notes", "text", "What it covers, and anything else."],
-      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
+      [
+        "Related",
+        "list",
+        "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…",
+        [],
+      ],
       [
         "Billing",
         "text",
@@ -373,7 +409,12 @@ const OM_TEMPLATES = [
       ["Billing", "text", "Monthly, Quarterly, Semiannually or Annually.", "Monthly"],
       ["Next_Billing", "date", "Date of the next charge."],
       ["Next_Renewal", "date", "When the subscription renews, if it has a term."],
-      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
+      [
+        "Related",
+        "list",
+        "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…",
+        [],
+      ],
     ],
   },
   {
@@ -389,7 +430,12 @@ const OM_TEMPLATES = [
       ["Billing", "text", "Monthly, Quarterly, Semiannually or Annually.", "Monthly"],
       ["Next_Billing", "date", "Date of the next charge."],
       ["License_Types", "list", 'Filled in by "Manage license types".', []],
-      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
+      [
+        "Related",
+        "list",
+        "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…",
+        [],
+      ],
     ],
   },
   {
@@ -405,7 +451,12 @@ const OM_TEMPLATES = [
       ["Due_Date", "date", "Payment due date."],
       ["Cost", "number", "Amount."],
       ["Notes", "text", 'What it is for. Shown as "Services".'],
-      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
+      [
+        "Related",
+        "list",
+        "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…",
+        [],
+      ],
       ["Paid_Date", "date", "Set by Mark paid.", undefined, true],
     ],
   },
@@ -422,7 +473,12 @@ const OM_TEMPLATES = [
       ["Ordered", "date", "Date it was ordered."],
       ["Employee", "link", "Who it is for, as a link: [[Jane Doe]]."],
       ["Notes", "text", "Anything else."],
-      ["Related", "list", "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…", []],
+      [
+        "Related",
+        "list",
+        "Links to connected notes, one per item: [[Office printer]], [[Printer lease]]…",
+        [],
+      ],
     ],
   },
   {
@@ -1564,7 +1620,9 @@ function omInvoiceAgeColor(fm) {
 }
 function omInvoicePaid(fm) {
   return (
-    ["paid", "complete", "completed"].includes(status(fm)) || fm.Paid === true || !!iso(fm.Payment_Date ?? fm.Paid_Date)
+    ["paid", "complete", "completed"].includes(status(fm)) ||
+    fm.Paid === true ||
+    !!iso(fm.Payment_Date ?? fm.Paid_Date)
   );
 }
 function omDashboardSortDate(plugin, r) {
@@ -1653,7 +1711,11 @@ class OperationsView extends ItemView {
           const title = info.createEl("button", { cls: "ops-item-title", text: r.file.basename });
           title.onclick = () => this.app.workspace.getLeaf(false).openFile(r.file);
           info.createEl("small", {
-            text: "Date: " + (iso(r.fm.Date) ?? r.fm.Date ?? "Not set") + " · Vendor: " + (r.fm.Vendor ?? "Not set"),
+            text:
+              "Date: " +
+              (iso(r.fm.Date) ?? r.fm.Date ?? "Not set") +
+              " · Vendor: " +
+              (r.fm.Vendor ?? "Not set"),
           });
           info.createEl("small", { text: r.reason || "" });
           if (r.fm.Notes !== undefined && r.fm.Notes !== null && String(r.fm.Notes).trim()) {
@@ -2205,7 +2267,10 @@ class OperationsView extends ItemView {
           info.createEl("small", {
             text:
               (dated
-                ? "Invoice date " + dated + " · " + (age === 0 ? "today" : age === 1 ? "1 day old" : age + " days old")
+                ? "Invoice date " +
+                  dated +
+                  " · " +
+                  (age === 0 ? "today" : age === 1 ? "1 day old" : age + " days old")
                 : "Invoice date not set") + (due ? " · Due " + due : ""),
           });
         }
@@ -4091,8 +4156,27 @@ module.exports = class OperationsManager extends Plugin {
     });
     heading.addClass("ops-equipment-heading");
     let sortBy = "filename";
+    let groupBy = dashboard ? "phase" : this.settings.equipmentGroupBy === "age" ? "age" : "status";
+    const setHeading = () =>
+      heading.setText(
+        dashboard ? "Equipment by Phase" : groupBy === "age" ? "Equipment by Age" : "Equipment by Status",
+      );
+    setHeading();
     const controls = root.createDiv({ cls: "ops-equipment-controls" });
     if (!dashboard) {
+      new Setting(controls).setName("Group by").addDropdown((d) =>
+        d
+          .addOption("status", "Status")
+          .addOption("age", "Age")
+          .setValue(groupBy)
+          .onChange(async (v) => {
+            groupBy = v;
+            setHeading();
+            draw();
+            this.settings.equipmentGroupBy = v;
+            await this.saveData(this.settings);
+          }),
+      );
       new Setting(controls).setName("Sort devices by").addDropdown((d) =>
         d
           .addOption("filename", "Filename")
@@ -4116,10 +4200,41 @@ module.exports = class OperationsManager extends Plugin {
         : typeof v === "object" && v !== null
           ? JSON.stringify(v)
           : String(v);
+    // Age in whole calendar years from the Ordered year (devices are replaced at 4 years).
+    const thisYear = new Date().getFullYear();
+    const orderedOn = (r) => iso(r.fm.Ordered ?? r.fm.Order_Date);
+    const ageKey = (r) => {
+      const d = orderedOn(r);
+      if (!d) return "none";
+      const age = Math.max(0, thisYear - Number(d.slice(0, 4)));
+      return age >= 5 ? "5+" : String(age);
+    };
+    const AGE_ORDER = ["5+", "4", "3", "2", "1", "0", "none"];
+    const ageLabel = (key) =>
+      key === "5+"
+        ? "5+ years old · ordered " + (thisYear - 5) + " or earlier · overdue"
+        : key === "4"
+          ? "4 years old · ordered in " + (thisYear - 4) + " · replace this year"
+          : key === "none"
+            ? "No Ordered date"
+            : key === "0"
+              ? "Less than 1 year · ordered in " + thisYear
+              : key +
+                (key === "1" ? " year old" : " years old") +
+                " · ordered in " +
+                (thisYear - Number(key));
     const draw = () => {
       area.empty();
       const groups = new Map();
-      for (const r of records) {
+      if (groupBy === "age") {
+        for (const r of records) {
+          if (status(r.fm) === "retired") continue;
+          const key = ageKey(r);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(r);
+        }
+      }
+      for (const r of groupBy === "age" ? [] : records) {
         const raw = dashboard ? (r.fm.Approved ?? r.fm.approved) : (r.fm.Status ?? r.fm.status);
         let group = populated(raw) ? String(raw).trim() : dashboard ? "Unassigned phase" : "No status";
         if (dashboard) {
@@ -4130,18 +4245,31 @@ module.exports = class OperationsManager extends Plugin {
         groups.get(group).push(r);
       }
       const names = [...groups.keys()].sort((a, b) =>
-        !dashboard && a.toLowerCase() === "complete"
-          ? 1
-          : !dashboard && b.toLowerCase() === "complete"
-            ? -1
-            : a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+        groupBy === "age"
+          ? AGE_ORDER.indexOf(a) - AGE_ORDER.indexOf(b)
+          : !dashboard && a.toLowerCase() === "complete"
+            ? 1
+            : !dashboard && b.toLowerCase() === "complete"
+              ? -1
+              : a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
       );
       if (!names.length) area.createEl("p", { text: "No equipment notes found." });
       for (const group of names) {
         const items = groups.get(group);
-        const section = area.createEl("details", { cls: "ops-equipment-phase" });
-        const collapseKey = mode + ":" + group;
-        section.open = this.settings.collapsedSections?.[collapseKey] === true;
+        const ageColor =
+          groupBy === "age"
+            ? group === "5+"
+              ? " ops-age-overdue"
+              : group === "4"
+                ? " ops-age-due"
+                : ""
+            : "";
+        const section = area.createEl("details", { cls: "ops-equipment-phase" + ageColor });
+        const collapseKey = (groupBy === "age" ? "age" : mode) + ":" + group;
+        const saved = this.settings.collapsedSections?.[collapseKey];
+        // The 5+ and 4-year cards start open; every other card starts closed.
+        section.open =
+          typeof saved === "boolean" ? saved : groupBy === "age" && (group === "5+" || group === "4");
         section.addEventListener("toggle", () => {
           const next = section.open;
           if (this.settings.collapsedSections?.[collapseKey] === next) return;
@@ -4151,7 +4279,9 @@ module.exports = class OperationsManager extends Plugin {
           };
           this.saveData(this.settings);
         });
-        section.createEl("summary", { text: group + " (" + items.length + ")" });
+        section.createEl("summary", {
+          text: (groupBy === "age" ? ageLabel(group) : group) + " (" + items.length + ")",
+        });
         const list = section.createDiv({ cls: "ops-equipment-list" });
         const ordered = [...items].sort((a, b) =>
           sortBy === "employee"
@@ -4194,13 +4324,22 @@ module.exports = class OperationsManager extends Plugin {
           };
           const summary = info.createEl("small");
           addLinkedText(summary, employeeName(r) || "No employee");
-          summary.createSpan({
-            text:
-              " · " +
-              (populated(r.fm.Ordered ?? r.fm.Order_Date) ? "Ordered" : "Not ordered") +
-              " · " +
-              (populated(r.fm.Set_Up ?? r.fm.Set_up) ? "Set up" : "Not set up"),
-          });
+          if (groupBy === "age") {
+            const model = r.fm.Device_Model ?? r.fm.Model;
+            summary.createSpan({
+              text:
+                " · " +
+                (orderedOn(r) ? "Ordered " + orderedOn(r) : "No Ordered date") +
+                (populated(model) ? " · " + showValue(model) : ""),
+            });
+          } else
+            summary.createSpan({
+              text:
+                " · " +
+                (populated(r.fm.Ordered ?? r.fm.Order_Date) ? "Ordered" : "Not ordered") +
+                " · " +
+                (populated(r.fm.Set_Up ?? r.fm.Set_up) ? "Set up" : "Not set up"),
+            });
           const note = r.fm.Notes;
           if (populated(note)) {
             const line = info.createDiv({ cls: "ops-equipment-note" });
